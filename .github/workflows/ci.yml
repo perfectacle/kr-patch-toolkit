@@ -16,6 +16,16 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.15.0"
+      - name: Install Lua 5.4
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends lua5.4
+      - name: Check Lua syntax
+        run: find lua -name '*.lua' -print0 | xargs -0 -n1 luac5.4 -p
       - run: python -m pip install -e '.[test]'
       - run: python -m pytest -q
-      - run: sfckr --version
+      - name: Build and install the wheel in a clean venv
+        run: |
+          python -m pip wheel . --no-deps -w dist
+          python -m venv /tmp/wheel-venv
+          /tmp/wheel-venv/bin/pip install dist/*.whl
+          /tmp/wheel-venv/bin/sfckr --version
+          test -f "$(/tmp/wheel-venv/bin/sfckr lua)/lib.lua"
