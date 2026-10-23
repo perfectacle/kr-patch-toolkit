@@ -352,9 +352,13 @@ print(loudness.integrated(x / 32768, rate))
 ## Development
 
 ```sh
-uv venv -p 3.15.0 .venv && uv pip install -p .venv -e '.[test]'
-.venv/bin/python -m pytest
+uv sync --locked
+uv run pytest
+uv run ruff check .
 ```
+
+`uv.lock` pins the development and CI environment and only takes releases at
+least seven days old. Coding agents start from [AGENTS.md](AGENTS.md).
 
 ## License
 

@@ -355,9 +355,13 @@ print(loudness.integrated(x / 32768, rate))
 ## 개발
 
 ```sh
-uv venv -p 3.15.0 .venv && uv pip install -p .venv -e '.[test]'
-.venv/bin/python -m pytest
+uv sync --locked
+uv run pytest
+uv run ruff check .
 ```
+
+`uv.lock` 은 개발·CI 환경을 고정하며, 나온 지 7일이 지난 릴리스만 받습니다.
+코딩 에이전트는 [AGENTS.md](AGENTS.md) 에서 시작합니다.
 
 ## 라이선스
 

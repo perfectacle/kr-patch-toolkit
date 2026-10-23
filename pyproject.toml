@@ -39,3 +39,17 @@ include = ["src", "tests", "examples", "README.md", "README.ko.md", "CHANGELOG.m
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = ["pytest>=7", "ruff>=0.17", "pip-audit>=2.9"]
+
+[tool.uv]
+# Supply-chain cooldown: resolve only releases at least a week old.
+exclude-newer = "7 days"
+
+[tool.ruff.lint]
+# Explicit so a ruff update that widens the default rule set does not fail CI on its own.
+# Bug-finding rules only: the code keeps short statements on one line on purpose.
+select = ["E4", "E9", "F", "B", "I"]
+# zip(strict=True) would turn a silent truncation into an exception, a behaviour change.
+ignore = ["B905"]

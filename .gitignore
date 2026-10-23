@@ -8,3 +8,5 @@ dist/
 *.sfc
 *.smc
 *.srm
+.ruff_cache/
+.omc/
