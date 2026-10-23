@@ -285,7 +285,7 @@ def test_loop_legacy_and_options(tmp_path, rec, capsys):
     assert code == 0 and legacy["durationSamples"] - legacy["loopEndSample"] == RATE // 2
     y, _ = wav.read(tmp_path / "l.wav")
     x, _ = wav.read(rec)
-    T, E = legacy["loopStartSample"], legacy["loopEndSample"]
+    E = legacy["loopEndSample"]
     assert np.array_equal(y[E:], x[E:E + RATE // 2])          # tail from the end
     code, out, err = run(capsys, *base, "--seam-pick", "best")
     best = json.loads(out)

@@ -67,6 +67,7 @@ def cmd_lzss_encode(a):
 
 def cmd_shotcmp(a):
     from PIL import Image
+
     from . import shots
     if not a.ref:
         if not (a.box and a.crop):
@@ -201,6 +202,7 @@ LOOP_LEGACY = {"fade_shape": "equal-power", "tail_from": "end", "seam_pick": "be
 
 def cmd_loop(a):
     import json
+
     from .audio import analysis, loop, wav
     if a.period and a.period_range:
         raise ValueError("pass --period or --period-range, not both")
@@ -255,6 +257,7 @@ def cmd_loop(a):
 
 def cmd_seamcheck(a):
     import json
+
     from .audio import loop, wav
     y, rate = wav.read(a.wav)
     meta = json.loads(Path(a.json or Path(a.wav).with_suffix(".json")).read_text())
@@ -286,6 +289,7 @@ def cmd_seamcheck(a):
 
 def cmd_loudness(a):
     import json
+
     from .audio import loudness, wav
     x, rate = wav.read(a.wav)
     lo, hi = _range(x, rate, a.start, a.end)
