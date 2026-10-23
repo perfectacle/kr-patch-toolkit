@@ -46,7 +46,34 @@ def to_image(data, w, h, pitch, pixfmt):
     return Image.frombuffer("RGB", (w, h), data, "raw", "BGR;15", pitch, 1)
 
 
+class LoadError(RuntimeError):
+    pass
+
+
+REQUIRED = ("retro_set_environment", "retro_set_video_refresh", "retro_set_audio_sample",
+            "retro_set_audio_sample_batch", "retro_set_input_poll", "retro_set_input_state",
+            "retro_init", "retro_deinit", "retro_load_game", "retro_unload_game", "retro_run",
+            "retro_get_memory_data", "retro_get_memory_size", "retro_cheat_set", "retro_cheat_reset")
+
+
+def load_core(path):
+    try:
+        core = C.CDLL(path)
+        for name in REQUIRED:
+            getattr(core, name)
+    except (OSError, AttributeError) as e:
+        raise LoadError(f"LOAD FAILED: {e}") from None
+    return core
+
+
 class Runner:
+    """Plays one script on one core.
+
+    Use one Runner per process: cores keep global state and ctypes reuses an
+    already loaded library, so a second run in the same process would not start
+    from a fresh core.
+    """
+
     def __init__(self, core, rom, out, script, srm=None, watches=(), variables=None,
                  verbose=None, cheat_hold=40):
         self.core_path, self.rom_path, self.out = core, rom, out
@@ -70,6 +97,8 @@ class Runner:
 
     def _callbacks(self):
         sysdir = C.c_char_p(self.out.encode())
+        # The log callback is variadic in C; ctypes cannot read the arguments, so
+        # the core's format string is printed as-is, with its % fields unexpanded.
         log_fn = LOG_CB(lambda level, fmt: self._log(fmt.decode(errors="replace")))
         log_iface = LogIface(C.cast(log_fn, C.c_void_p))
 
@@ -105,7 +134,7 @@ class Runner:
                 return 0
             return int(id_ in self.held)
 
-        # ctypes callbacks must outlive the core's use of them
+        # ctypes callbacks must outlive the core's use of them, i.e. until after retro_deinit
         self._keep = (sysdir, log_fn, log_iface, ENV_CB(env), VID_CB(video), AUD_CB(lambda l, r: None),
                       AUDB_CB(lambda d, n: n), POLL_CB(lambda: None), IN_CB(inp))
         return self._keep[3:]
@@ -122,11 +151,10 @@ class Runner:
 
     def run(self):
         os.makedirs(self.out, exist_ok=True)
-        core = C.CDLL(self.core_path)
+        core = load_core(self.core_path)
         core.retro_get_memory_data.restype = C.c_void_p
         core.retro_get_memory_size.restype = C.c_size_t
         env, video, audio, audio_batch, poll, inp = self._callbacks()
-        sc = self.script
         self.held = set()
 
         if self.srm is not None:
@@ -141,16 +169,41 @@ class Runner:
         core.retro_set_input_poll(poll)
         core.retro_set_input_state(inp)
         core.retro_init()
-        rom = open(self.rom_path, "rb").read()
-        buf = C.create_string_buffer(rom, len(rom))
-        gi = GameInfo(os.path.abspath(self.rom_path).encode(), C.cast(buf, C.c_void_p), len(rom), None)
-        if not core.retro_load_game(C.byref(gi)):
-            raise RuntimeError("LOAD FAILED")
+        loaded = False
+        try:
+            rom = open(self.rom_path, "rb").read()
+            buf = C.create_string_buffer(rom, len(rom))
+            gi = GameInfo(os.path.abspath(self.rom_path).encode(), C.cast(buf, C.c_void_p), len(rom), None)
+            if not core.retro_load_game(C.byref(gi)):
+                raise LoadError("LOAD FAILED: the core rejected the ROM")
+            loaded = True
+            self._play(core)
+        finally:
+            if loaded:
+                core.retro_unload_game()
+            core.retro_deinit()
+        if self.last:
+            self.save_png(os.path.join(self.out, "end.png"))
+        return self.frame
 
+    def _check_wram(self, size):
+        for f, pokes in self.script.pokes.items():
+            for a, _ in pokes:
+                if a + S.POKE_SIZE > size:
+                    raise ValueError(f"poke at frame {f}: ${a:X} is outside the core's {size:#x}-byte WRAM")
+        for w in self.watches:
+            if w.offset + w.size > size:
+                raise ValueError(f"watch ${w.offset:X}:{w.size} is outside the core's {size:#x}-byte WRAM")
+
+    def _play(self, core):
+        sc = self.script
         if self.srm is not None:
             self._inject_srm(core)
         wram = core.retro_get_memory_data(MEM_SYSTEM_RAM)
-        cheat_off = 0
+        if wram:
+            self._check_wram(core.retro_get_memory_size(MEM_SYSTEM_RAM))
+        cheats = {}         # index -> (frame it expires, code)
+        next_cheat = 0
         prev = None
         with open(os.path.join(self.out, "wram.log"), "w") as log:
             while self.frame < sc.end:
@@ -160,18 +213,22 @@ class Runner:
                 f = self.frame
                 if self.srm is not None and f == 1:   # some cores clear SRAM during their first frame
                     self._inject_srm(core)
-                for j, (a, v) in enumerate(sc.pokes.get(f, ())):
+                for a, v in sc.pokes.get(f, ()):
                     if wram:
                         C.memmove(wram + a, bytes([v & 0xFF, v >> 8]), 2)
-                    else:
-                        # bsnes and Supafaust expose no WRAM pointer. Their cheats patch
-                        # reads, so hold the value long enough for the game to read it.
-                        for k, code in enumerate(S.par_codes(a, v)):
-                            core.retro_cheat_set(j * 2 + k, True, code.encode())
-                        cheat_off = f + self.cheat_hold
-                if cheat_off and f >= cheat_off:
+                        continue
+                    # bsnes and Supafaust expose no WRAM pointer. Their cheats patch
+                    # reads, so hold the value long enough for the game to read it.
+                    for code in S.par_codes(a, v):
+                        core.retro_cheat_set(next_cheat, True, code.encode())
+                        cheats[next_cheat] = (f + self.cheat_hold, code)
+                        next_cheat += 1
+                expired = [i for i, (until, _) in cheats.items() if f >= until]
+                for i in expired:
+                    core.retro_cheat_set(i, False, cheats.pop(i)[1].encode())
+                if expired and not cheats:
                     core.retro_cheat_reset()
-                    cheat_off = 0
+                    next_cheat = 0
                 if wram and self.watches:
                     v = tuple(int.from_bytes(C.string_at(wram + w.offset, w.size), "little") for w in self.watches)
                     if v != prev:
@@ -185,6 +242,3 @@ class Runner:
                                 fp.write(C.string_at(ptr, n))
                 if f in sc.shots and self.last:
                     self.save_png(os.path.join(self.out, f"f{f:05d}.png"))
-        if self.last:
-            self.save_png(os.path.join(self.out, "end.png"))
-        return self.frame

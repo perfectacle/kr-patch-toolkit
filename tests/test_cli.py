@@ -6,13 +6,14 @@ from sfc_kr.codec import lzss
 from sfc_kr.gfx import tiles
 
 
-def run(capsys, *args):
+def run(capsys, *args, err=False):
     code = 0
     try:
         cli.main([str(a) for a in args])
     except SystemExit as e:
-        code = e.code or 0
-    return code, capsys.readouterr().out
+        code = e.code if isinstance(e.code, int) else (1 if e.code else 0)
+    o = capsys.readouterr()
+    return (code, o.out, o.err) if err else (code, o.out)
 
 
 def test_ips_make_apply(tmp_path, capsys, rom_factory):
@@ -90,6 +91,16 @@ def test_shotcmp_exit_status(tmp_path, capsys):
     code, out = run(capsys, "shotcmp", tmp_path / "a.png", tmp_path / "b.png", "--crop", tmp_path / "c.png")
     assert code == 1 and "diff px=16" in out
     assert Image.open(tmp_path / "c.png").size == (4, 4)
+    act, ref = tmp_path / "act", tmp_path / "ref"
+    act.mkdir(); ref.mkdir()
+    Image.new("RGB", (4, 4)).save(act / "x.png")
+    Image.new("RGB", (4, 4)).save(ref / "x.png")
+    assert run(capsys, "shotcmp", act, ref)[0] == 0
+    Image.new("RGB", (4, 4)).save(ref / "y.png")
+    code, out = run(capsys, "shotcmp", act, ref)
+    assert code == 1 and "y.png: missing" in out
+    (tmp_path / "e1").mkdir(); (tmp_path / "e2").mkdir()
+    assert run(capsys, "shotcmp", tmp_path / "e1", tmp_path / "e2")[0] == 2
 
 
 def test_glyph(tmp_path, capsys):
@@ -100,12 +111,39 @@ def test_glyph(tmp_path, capsys):
     assert out.splitlines()[1].startswith("####")
     code, out = run(capsys, "glyph", "show", store, "다")
     assert out.splitlines() == ["다", "####", "#..#"]
+    code, out, err = run(capsys, "glyph", "show", store, "다라", err=True)
+    assert code == 1 and out.splitlines()[0] == "다" and "라" in err
 
 
-def test_run_rejects_bad_script(tmp_path):
-    (tmp_path / "s.txt").write_text("10 jump 4\n")
-    with pytest.raises(ValueError):
-        cli.main(["run", "nocore", "norom", str(tmp_path / "out"), str(tmp_path / "s.txt")])
+def test_run_rejects_bad_script(tmp_path, capsys):
+    (tmp_path / "s.txt").write_text("10 jump 4\n20 end\n")
+    code, out, err = run(capsys, "run", "nocore", "norom", tmp_path / "out", tmp_path / "s.txt", err=True)
+    assert code == 2 and "unknown button" in err
+
+
+def test_run_load_failed(tmp_path, capsys):
+    (tmp_path / "s.txt").write_text("10 end\n")
+    (tmp_path / "r.sfc").write_bytes(bytes(0x8000))
+    code, out, err = run(capsys, "run", tmp_path / "missing_libretro.so", tmp_path / "r.sfc",
+                         tmp_path / "out", tmp_path / "s.txt", err=True)
+    assert code == 3 and err.startswith("LOAD FAILED") and out == ""
+
+
+def test_errors_exit_2(tmp_path, capsys):
+    code, out, err = run(capsys, "ips", "apply", tmp_path / "nope.sfc", tmp_path / "nope.ips", tmp_path / "o", err=True)
+    assert code == 2 and err.startswith("sfckr: error:")
+    (tmp_path / "bad.lz").write_bytes(b"\x05")
+    code, out, err = run(capsys, "lz", "decode", tmp_path / "bad.lz", "0", tmp_path / "o", err=True)
+    assert code == 2 and "truncated" in err
+
+
+def test_checksum_fix_refuses_unknown_header(tmp_path, capsys):
+    p = tmp_path / "junk.bin"
+    p.write_bytes(bytes(0x10000))
+    code, out, err = run(capsys, "checksum", p, "--fix", err=True)
+    assert code == 2 and "--mapper" in err
+    assert p.read_bytes() == bytes(0x10000)
+    assert run(capsys, "checksum", p, "--fix", "--mapper", "lorom")[0] == 0
 
 
 def test_lua_dir(capsys):

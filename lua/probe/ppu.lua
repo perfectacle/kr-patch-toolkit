@@ -1,5 +1,5 @@
 -- At frame PF write the PPU BG/screen state and, optionally, the bytes of a RAM range
--- SHADOW="0A00-0A24" (hex, CPU addresses, e.g. a game's register shadow) to ppu.txt.
+-- SHADOW="0100-011F" (hex, CPU addresses) to ppu.txt.
 package.path = os.getenv("LIBDIR") .. "/?.lua;" .. package.path
 local L = require("lib")
 local f = 0

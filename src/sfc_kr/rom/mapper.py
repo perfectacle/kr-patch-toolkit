@@ -64,15 +64,21 @@ class ExHiROM(Mapper):
 
 
 class SA1(Mapper):
-    """SA-1 with the default Super MMC banks: $C0-$FF are 64 KB HiROM-style banks,
-    $00-$3F/$80-$BF:8000-FFFF mirror the first 2 MB as 32 KB LoROM-style banks."""
+    """SA-1 Super MMC. $C0-$FF are 64 KB HiROM-style banks over the first 4 MB.
+    $00-$1F, $20-$3F, $80-$9F and $A0-$BF (upper halves) are 32 KB LoROM-style
+    banks into the 1 MB blocks selected by CXB, DXB, EXB and FXB ($2220-$2223).
+    `blocks` are those register values; the power-on default is 0, 1, 2, 3."""
     name = "sa1"
+
+    def __init__(self, blocks=(0, 1, 2, 3)):
+        self.blocks = tuple(blocks)
 
     def to_offset(self, addr):
         bank, lo = addr >> 16, addr & 0xFFFF
         if bank >= 0xC0:
             return ((bank & 0x3F) << 16) | lo
-        return ((bank & 0x3F) << 15) | (lo & 0x7FFF)
+        blk = self.blocks[(bank >> 6 & 2) | (bank >> 5 & 1)]
+        return (blk << 20) | ((bank & 0x1F) << 15) | (lo & 0x7FFF)
 
     def to_cpu(self, off):
         return 0xC00000 | (off & 0x3FFFFF)

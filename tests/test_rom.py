@@ -43,9 +43,10 @@ def test_copier_header():
 
 
 @pytest.mark.parametrize("cls,cases", [
-    (mapper.LoROM, [(0x808000, 0), (0x80FFFF, 0x7FFF), (0x818000, 0x8000), (0x008000, 0), (0xC37948, 0x21F948)]),
+    (mapper.LoROM, [(0x808000, 0), (0x80FFFF, 0x7FFF), (0x818000, 0x8000), (0x008000, 0), (0xC12345, 0x20A345)]),
     (mapper.HiROM, [(0xC00000, 0), (0xC12345, 0x12345), (0x408000, 0x8000), (0x01C000, 0x1C000)]),
-    (mapper.SA1, [(0xC00000, 0), (0xC12345, 0x12345), (0x008000, 0), (0x018000, 0x8000), (0x3F8000, 0x1F8000)]),
+    (mapper.SA1, [(0xC00000, 0), (0xC12345, 0x12345), (0x008000, 0), (0x018000, 0x8000), (0x3F8000, 0x1F8000),
+                  (0x808000, 0x200000), (0xBFFFFF, 0x3FFFFF), (0xA08000, 0x300000), (0x9F8000, 0x2F8000)]),
     (mapper.ExHiROM, [(0xC00000, 0), (0xFFFFFF, 0x3FFFFF), (0x400000, 0x400000), (0x7D1234, 0x7D1234),
                       (0x808000, 0x8000)]),
 ])
@@ -145,3 +146,32 @@ def test_diff_ranges():
     assert diff.ranges(a, b, gap=2) == [(3, 3), (10, 10), (50, 51)]
     assert diff.ranges(a, a) == []
     assert diff.ranges(a, a + b"\x00\x00") == [(100, 101)]
+
+
+def test_sa1_block_registers():
+    mp = mapper.SA1(blocks=(4, 5, 6, 7))
+    assert mp.to_offset(0x008000) == 0x400000
+    assert mp.to_offset(0x208000) == 0x500000
+    assert mp.to_offset(0x808000) == 0x600000
+    assert mp.to_offset(0xA08000) == 0x700000
+    assert mp.to_offset(0xC00000) == 0          # $C0-$FF ignore the block registers
+
+
+def test_header_requires_room():
+    for mp in (mapper.LoROM(), mapper.HiROM()):
+        with pytest.raises(ValueError, match="no .* header"):
+            header.stored(bytes(mp.header + 0x3F), mp)
+        with pytest.raises(ValueError):
+            header.fix(bytes(0x100), mp)
+
+
+def test_detect_score(rom_factory):
+    mp, score = header.detect_score(rom_factory("hirom"))
+    assert mp.name == "hirom" and score >= header.CONFIDENT
+    mp, score = header.detect_score(bytes(0x10000))
+    assert score < header.CONFIDENT
+
+
+def test_ips_size_limit():
+    with pytest.raises(ValueError, match="24-bit"):
+        ips.make(b"", bytes(0x1000000))

@@ -57,3 +57,13 @@ def test_planar_conversion():
     snes = lzss.planar_to_snes(tile)
     assert snes[:4] == bytes([0, 8, 1, 9])
     assert lzss.snes_to_planar(snes) == tile
+
+
+@pytest.mark.parametrize("stream,match", [
+    (b"\x05", "truncated"),
+    (bytes([4, 0, 0b1, ord("a")]), "truncated"),            # flag byte promises a copy word
+    (bytes([4, 0, 0b0, 0x01, 0x00]), "distance 0"),
+])
+def test_decompress_rejects_bad_streams(stream, match):
+    with pytest.raises(ValueError, match=match):
+        lzss.decompress(stream)

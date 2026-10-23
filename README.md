@@ -36,7 +36,8 @@ sfckr dis game.sfc C08000 --mapper sa1    # lorom | hirom | exhirom | sa1 | auto
 sfckr dis game.sfc 808000 --m16 --x16     # start with 16-bit A and X/Y
 ```
 
-`REP`/`SEP` update the register widths as decoding goes on. `auto` reads the
+`REP`/`SEP` update the register widths as decoding goes on. Block moves are
+printed in assembler order, `MVN src,dst`. `auto` reads the
 internal header to pick the mapper; a 512-byte copier header is skipped.
 
 ### `ips`: create and apply IPS patches
@@ -58,6 +59,8 @@ value a project has already shipped with.
 sfckr checksum game.sfc          # prints mapper, title, stored and computed values; exit 1 if wrong
 sfckr checksum game.sfc --fix    # rewrite complement and checksum in place
 ```
+
+`--fix` refuses when no internal header is recognisable, unless `--mapper` is given.
 
 Non-power-of-two sizes are summed the way the cartridge mirrors them.
 
@@ -81,7 +84,7 @@ START and LENGTH are byte offsets into any file (ROM, VRAM dump, decompressed da
 
 ```sh
 sfckr bg vram.bin cgram.bin 0 0x1000 4 bg1.png             # tilemap and CHR word addresses, bpp
-sfckr bgrefs vram.bin --layer 0:4096:4 --layer 2048:12288:4 --layer 3072:20480:2 --range 6000-7FFF
+sfckr bgrefs vram.bin --layer 0:0x1000:4 --layer 0x400:0x2000:4 --layer 0x800:0x3000:2 --range 6000-7FFF
 ```
 
 `bgrefs` reports which part of a VRAM range each layer's tilemap uses, for
@@ -103,12 +106,14 @@ sfckr lz encode font.bin font.lz [--planar]
 ### `run`: headless libretro runner
 
 ```sh
-sfckr run cores/snes9x_libretro.dylib game.sfc out/ s_new.txt [save.srm] --watch 7E0052:3
+sfckr run cores/snes9x_libretro.dylib game.sfc out/ s_new.txt [save.srm] --watch 7E0010:2
 ```
 
 Plays an input script and writes `f<frame>.png` screenshots, `end.png`,
 dumps, and `wram.log` (frame and watched WRAM values, one line per change) to
-`out/`. Prints `OK <frames>`, or `LOAD FAILED` with exit status 3.
+`out/`. Prints `OK <frames>`. If the core cannot be loaded (missing file, missing
+`retro_*` symbols, ROM rejected) it prints `LOAD FAILED: ...` to stderr and
+exits with status 3. Run one script per process: cores keep global state.
 
 - `--watch ADDR[:SIZE]` (repeatable): WRAM offset or `$7E`/`$7F` address and size in bytes.
 - `--watch-fmt SPEC`: Python format spec for watched values (default `0<2*SIZE>X`).
@@ -124,12 +129,14 @@ Script format, one command per line, frames counted from power-on:
 900 tap a 40 2000       4-frame A presses every 40 frames until frame 2000
 1000 shot               screenshot f01000.png
 1000 dump               wram_1000.bin and sram_1000.bin
-1100 poke 029C 0123     16-bit WRAM write after frame 1100
+1100 poke 0010 1234     16-bit WRAM write after frame 1100
 3000 end                stop after frame 3000
 ```
 
-Buttons: `a b x y l r start select up down left right`. Lines starting with `#`
-are comments. On cores without a WRAM pointer (bsnes, Supafaust) a poke is
+Buttons (any case): `a b x y l r start select up down left right`. Lines
+starting with `#` are comments. `end` is required, and a command after the end
+frame is an error. Pokes and watches must lie inside the 128 KB of WRAM (and
+inside what the core exposes). On cores without a WRAM pointer (bsnes, Supafaust) a poke is
 applied as a Pro Action Replay cheat for `--cheat-hold` frames (default 40).
 
 `examples/run_all.sh` runs every scenario on every core (and Mesen 2) and
@@ -138,14 +145,16 @@ collects one result line per run.
 ### `shotcmp`, `contact`: screenshots as text
 
 ```sh
-sfckr shotcmp out/new-snes9x-v11 ref/new-snes9x-v11          # directories, matched by file name
+sfckr shotcmp out/new-snes9x-v1 ref/new-snes9x-v1            # directories, matched by file name
 sfckr shotcmp actual.png ref.png --box 0,160,256,64 --tol 8 --crop diff.png
 sfckr shotcmp actual.png --box 0,160,256,64 --crop crop.png  # crop only
 sfckr contact 'out/new-*/end.png' sheet.png --cols 8
 ```
 
 `shotcmp` prints `same` or the number of differing pixels and their bounding
-box, and exits 1 if any pair differs.
+box, and exits 1 if any pair differs. A pixel differs when any colour channel
+differs by more than `--tol`. With directories, a PNG present on only one side
+counts as a difference, and two directories without PNGs are an error.
 
 ### `glyph`, `ocr`: bitmap glyphs
 

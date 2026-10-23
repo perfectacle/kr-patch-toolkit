@@ -54,6 +54,11 @@ def cmd_checksum(a):
     pre = data[:header.COPIER] if header.has_copier(data) else b""
     rom = data[len(pre):]
     mp = _mapper(a.mapper, rom)
+    if a.fix and a.mapper == "auto":
+        mp, score = header.detect_score(rom)
+        if score < header.CONFIDENT:
+            raise ValueError(f"no recognisable internal header (best guess {mp.name}, score {score}); "
+                             "pass --mapper to fix it anyway")
     if a.fix:
         rom, s = header.fix(rom, mp)
         Path(a.rom).write_bytes(pre + rom)
@@ -123,8 +128,8 @@ def cmd_run(a):
                         verbose=a.verbose or None, cheat_hold=a.cheat_hold)
     try:
         n = r.run()
-    except RuntimeError as e:
-        print(e)
+    except libretro.LoadError as e:
+        print(e, file=sys.stderr)
         sys.exit(3)
     print("OK", n)
 
@@ -141,8 +146,8 @@ def cmd_shotcmp(a):
     ps = shots.pairs(a.actual, a.ref)
     failed = 0
     for x, y in ps:
-        if not y.exists():
-            print(f"{x.name}: no reference")
+        if not x.exists() or not y.exists():
+            print(f"{x.name}: {'no reference' if x.exists() else 'missing'}")
             failed += 1
             continue
         bbox, msg = shots.compare(x, y, a.box, a.tol)
@@ -169,7 +174,14 @@ def cmd_glyph(a):
         return store[ch]
 
     if a.op == "show":
-        lines = G.side_by_side([(c, get(c)) for c in a.args[0] if c in store])
+        missing = [c for c in a.args[0] if c not in store]
+        lines = G.side_by_side([(c, store[c]) for c in a.args[0] if c in store])
+        if lines[0]:
+            print("\n".join(lines))
+        if missing:
+            print(f"not in {a.store}: {''.join(missing)}", file=sys.stderr)
+            sys.exit(1)
+        return
     elif a.op == "make":
         ch, base, specs = a.args[0], a.args[1], a.args[2:]
         g = get(base)
@@ -219,7 +231,7 @@ def build_parser():
 
     p = sub.add_parser("dis", help="disassemble 65c816 code")
     p.add_argument("rom")
-    p.add_argument("addr", type=_hex, help="CPU address in hex, e.g. C37948")
+    p.add_argument("addr", type=_hex, help="CPU address in hex, e.g. 808000")
     p.add_argument("count", type=int, nargs="?", default=40)
     p.add_argument("--mapper", choices=mappers, default="auto")
     p.add_argument("--m16", action="store_true", help="start with a 16-bit accumulator")
@@ -349,8 +361,13 @@ def build_parser():
 
 
 def main(argv=None):
-    a = build_parser().parse_args(argv)
-    a.fn(a)
+    ap = build_parser()
+    a = ap.parse_args(argv)
+    try:
+        a.fn(a)
+    except (ValueError, OSError, IndexError) as e:
+        print(f"{ap.prog}: error: {e}", file=sys.stderr)
+        sys.exit(2)
 
 
 if __name__ == "__main__":

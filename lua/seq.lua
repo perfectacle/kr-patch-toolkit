@@ -8,10 +8,10 @@ for tok in string.gmatch(os.getenv("SEQ"), "[^,]+") do
   local b, f = tok:match("([%w+]+):(%d+)")
   steps[#steps + 1] = {b, tonumber(f)}
 end
--- POKE="7E3112=FF;..." is re-applied every frame (CPU bus addresses).
+-- POKE="7E0010=FF;..." is re-applied every frame (CPU bus addresses).
 local pokes = {}
 for a, v in string.gmatch(os.getenv("POKE") or "", "(%x+)=(%x+)") do pokes[#pokes + 1] = {tonumber(a, 16), tonumber(v, 16)} end
--- WATCH="name=7E0C10:2;..." logs little-endian values (CPU bus, 1-4 bytes) to watch.txt
+-- WATCH="name=7E0020:2;..." logs little-endian values (CPU bus, 1-4 bytes) to watch.txt
 -- every EVERY frames and at the end, so state can be read as text instead of from screenshots.
 local watches = {}
 for name, a, len in string.gmatch(os.getenv("WATCH") or "", "([%w_]+)=(%x+):?(%d*)") do

@@ -1,13 +1,14 @@
 from sfc_kr.disasm import decode, disasm
 from sfc_kr.rom import mapper
 
-# REP #$30; LDA #$1234; LDX #$5678; SEP #$20; LDA #$9A; BRA -2; JSL $C08000; MVN $7E,$7F; BRL +0
-CODE = bytes.fromhex("C230 A93412 A27856 E220 A99A 80FE 220080C0 547F7E 820000")
+# REP #$30; LDA #$1234; LDX #$5678; SEP #$20; LDA #$9A; BRA -2; JSL $C08000;
+# MVN $7E,$7F (source $7E, destination $7F: encoded 54 7F 7E); BRL +0; PEI ($12)
+CODE = bytes.fromhex("C230 A93412 A27856 E220 A99A 80FE 220080C0 547F7E 820000 D412")
 
 
 def test_lorom_listing(rom_factory):
     rom = rom_factory("lorom", code=CODE, code_at=0x808000)
-    out = disasm(rom, 0x808000, 9, mapper=mapper.LoROM()).splitlines()
+    out = disasm(rom, 0x808000, 10, mapper=mapper.LoROM()).splitlines()
     assert out == [
         "80:8000  c2 30        REP #$30",
         "80:8002  a9 34 12     LDA #$1234",
@@ -16,8 +17,9 @@ def test_lorom_listing(rom_factory):
         "80:800A  a9 9a        LDA #$9A",
         "80:800C  80 fe        BRA $80800C",
         "80:800E  22 00 80 c0  JSL $C08000",
-        "80:8012  54 7f 7e     MVN $7F,$7E",
+        "80:8012  54 7f 7e     MVN $7E,$7F",
         "80:8015  82 00 00     BRL $808018",
+        "80:8018  d4 12        PEI ($12)",
     ]
 
 

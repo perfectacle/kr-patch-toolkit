@@ -7,16 +7,19 @@ One command per line, frames counted from power-on (1 = after the first frame):
     F shot                      screenshot f<F>.png
     F dump                      WRAM and SRAM to wram_<F>.bin / sram_<F>.bin
     F poke ADDR VALUE           16-bit little-endian WRAM write after frame F (hex)
-    F end                       stop after frame F
+    F end                       stop after frame F (required)
 
-ADDR is a WRAM offset ($0000-$1FFFF) or a full $7E/$7F address.
-Blank lines and lines starting with # are ignored.
+ADDR is a WRAM offset ($0000-$1FFFF) or a full $7E/$7F address. Button names
+are case-insensitive. Blank lines and lines starting with # are ignored. A
+command after the end frame is an error, since it would never run.
 """
 from dataclasses import dataclass, field
 
 BUTTONS = {"b": 0, "y": 1, "select": 2, "start": 3, "up": 4, "down": 5, "left": 6, "right": 7,
            "a": 8, "x": 9, "l": 10, "r": 11}
 TAP_LEN = 4
+WRAM_SIZE = 0x20000
+POKE_SIZE = 2
 
 
 @dataclass
@@ -35,11 +38,12 @@ class Script:
         return s
 
 
-def wram_offset(a):
+def wram_offset(a, size=1):
+    """WRAM offset of a $7E/$7F address or offset, checked so `size` bytes fit."""
     if 0x7E0000 <= a <= 0x7FFFFF:
-        return a - 0x7E0000
-    if a > 0x1FFFF:
-        raise ValueError(f"${a:06X} is not in WRAM")
+        a -= 0x7E0000
+    if a + size > WRAM_SIZE:
+        raise ValueError(f"${a:X} + {size} bytes is outside WRAM")
     return a
 
 
@@ -52,30 +56,43 @@ def _buttons(spec, n):
 
 def parse(lines):
     sc = Script()
+    end_line = None
+    frames = []     # (frame, line number) of every command but end
     for n, line in enumerate(lines, 1):
         p = line.split()
         if not p or p[0].startswith("#"):
             continue
         if len(p) < 2:
             raise ValueError(f"line {n}: expected 'frame command ...': {line.strip()!r}")
-        f, cmd = int(p[0]), p[1]
+        f, cmd = int(p[0]), p[1].lower()
         try:
+            if cmd == "end":
+                sc.end, end_line = f, n
+                continue
             if cmd == "shot":
                 sc.shots.add(f)
             elif cmd == "dump":
                 sc.dumps.add(f)
-            elif cmd == "end":
-                sc.end = f
             elif cmd == "tap":
                 btn = _buttons(p[2], n)
                 for t in range(f, int(p[4]), int(p[3])):
                     sc.presses.append((t, t + TAP_LEN, btn))
             elif cmd == "poke":
-                sc.pokes.setdefault(f, []).append((wram_offset(int(p[2], 16)), int(p[3], 16) & 0xFFFF))
+                try:
+                    a = wram_offset(int(p[2], 16), POKE_SIZE)
+                except ValueError as e:
+                    raise ValueError(f"line {n}: {e}") from None
+                sc.pokes.setdefault(f, []).append((a, int(p[3], 16) & 0xFFFF))
             else:
                 sc.presses.append((f, f + int(p[2]), _buttons(cmd, n)))
         except IndexError:
             raise ValueError(f"line {n}: missing argument for {cmd!r}") from None
+        frames.append((f, n))
+    if end_line is None:
+        raise ValueError("script has no 'end' command")
+    late = [n for f, n in frames if f > sc.end]
+    if late:
+        raise ValueError(f"line {late[0]}: frame is after 'end' at frame {sc.end}")
     return sc
 
 
@@ -98,9 +115,12 @@ class Watch:
 
     @classmethod
     def parse(cls, spec, fmt=""):
-        """'ADDR[:SIZE]' with ADDR in hex."""
+        """'ADDR[:SIZE]' with ADDR in hex and SIZE 1-4 bytes."""
         a, _, n = spec.partition(":")
-        return cls(wram_offset(int(a, 16)), int(n) if n else 1, fmt)
+        size = int(n) if n else 1
+        if not 1 <= size <= 4:
+            raise ValueError(f"watch {spec!r}: size must be 1-4 bytes")
+        return cls(wram_offset(int(a, 16), size), size, fmt)
 
     def format(self, v):
         return format(v, self.fmt or f"0{self.size * 2}X")

@@ -14,25 +14,32 @@ MAX_DIST = 0xFFF
 
 
 def decompress(rom, off=0):
-    """(data, compressed length) of the stream at `off`."""
-    size = rom[off] | rom[off + 1] << 8
-    i = off + 2
-    out = bytearray()
-    flags = bits = 0
-    while len(out) < size:
-        if bits == 0:
-            flags = rom[i]; i += 1; bits = 8
-        bits -= 1
-        bit = flags & 1; flags >>= 1
-        if bit:
-            out.append(rom[i]); i += 1
-        else:
-            w = rom[i] | rom[i + 1] << 8; i += 2
-            n = (w & 0xF) + MIN_LEN
-            src = len(out) - (w >> 4)
-            for _ in range(n):
-                out.append(out[src] if src >= 0 else 0)
-                src += 1
+    """(data, compressed length) of the stream at `off`. Raises ValueError on a
+    stream that ends early or copies from distance 0."""
+    i = off
+    try:
+        size = rom[off] | rom[off + 1] << 8
+        i = off + 2
+        out = bytearray()
+        flags = bits = 0
+        while len(out) < size:
+            if bits == 0:
+                flags = rom[i]; i += 1; bits = 8
+            bits -= 1
+            bit = flags & 1; flags >>= 1
+            if bit:
+                out.append(rom[i]); i += 1
+            else:
+                w = rom[i] | rom[i + 1] << 8; i += 2
+                if w >> 4 == 0:
+                    raise ValueError(f"LZSS copy with distance 0 at offset {i - 2:#x}")
+                n = (w & 0xF) + MIN_LEN
+                src = len(out) - (w >> 4)
+                for _ in range(n):
+                    out.append(out[src] if src >= 0 else 0)
+                    src += 1
+    except IndexError:
+        raise ValueError(f"LZSS stream at {off:#x} is truncated at offset {i:#x}") from None
     return bytes(out[:size]), i - off
 
 

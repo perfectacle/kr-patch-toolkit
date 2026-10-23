@@ -15,7 +15,9 @@ def compare(a_path, b_path, box=None, tol=0):
     b = region(Image.open(b_path).convert("RGB"), box)
     if a.size != b.size:
         return None, f"size {a.size} != {b.size}"
-    diff = ImageChops.difference(a, b).convert("L").point(lambda v: 255 if v > tol else 0)
+    # largest per-channel difference, so a change in one channel is not averaged away
+    r, g, bl = ImageChops.difference(a, b).split()
+    diff = ImageChops.lighter(ImageChops.lighter(r, g), bl).point(lambda v: 255 if v > tol else 0)
     bbox = diff.getbbox()
     if not bbox:
         return None, "same"
@@ -26,11 +28,16 @@ def compare(a_path, b_path, box=None, tol=0):
 
 
 def pairs(actual, ref):
-    """ACTUAL/REF may be files or directories (PNG files matched by name)."""
+    """ACTUAL/REF may be files or directories. Directories are matched by PNG
+    file name over the names in either one, so a file missing on one side still
+    shows up as a pair (check .exists() on both)."""
     act, ref = Path(actual), Path(ref)
-    if act.is_dir():
-        return [(f, ref / f.name) for f in sorted(act.glob("*.png")) if f.name != "contact.png"]
-    return [(act, ref)]
+    if not act.is_dir():
+        return [(act, ref)]
+    names = {f.name for d in (act, ref) if d.is_dir() for f in d.glob("*.png")} - {"contact.png"}
+    if not names:
+        raise ValueError(f"no PNG files in {act} or {ref}")
+    return [(act / n, ref / n) for n in sorted(names)]
 
 
 def contact(pattern, out, cols=10, scale=0.5, label=10):

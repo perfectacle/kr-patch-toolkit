@@ -8,13 +8,13 @@
 #   roms/save.srm                 save RAM for scenarios listed in SAVE_SCENARIOS
 #   s_<scenario>.txt              input scripts (see `sfckr run -h`)
 # env:
-#   SETS="new:jp,v10 cont:jp,v10"  scenario:roms pairs
-#   WATCH_WRAM="7E0052:3"          WRAM value(s) logged to wram.log, comma separated
+#   SETS="new:v1,v2 cont:v1,v2"    scenario:roms pairs
+#   WATCH_WRAM="7E0010:2"          WRAM value(s) logged to wram.log, comma separated
 #   MESEN=/path/to/Mesen           also run Mesen 2 through `sfckr lua`/script.lua
 #   MESEN_SAVES                    Mesen 2 save folder (it loads Saves/<rom name>.srm on power-on)
 cd "$(dirname $0)"
 export LRVARS=${LRVARS:-"supafaust_thread_affinity_ppu=0x0,supafaust_thread_affinity_emu=0x0"}
-SETS=(${=SETS:-new:jp cont:jp})
+SETS=(${=SETS:-new:v1 cont:v1})
 SAVE_SCENARIOS=(${=SAVE_SCENARIOS:-cont})
 cores=($@)
 (( $# )) || cores=(bsnes bsnes_hd_beta snes9x snes9x2010 mednafen_supafaust mesen-s)

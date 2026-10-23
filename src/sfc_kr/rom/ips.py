@@ -19,8 +19,9 @@ def make(a, b, header=False, gap=GAP):
     """
     if header:
         a, b = bytes(COPIER) + bytes(a), bytes(COPIER) + bytes(b)
-    if len(b) < len(a) or len(b) > 0x1000000:
-        raise ValueError("target must be at least as large as the source and at most 16 MB")
+    if len(b) < len(a) or len(b) > 0xFFFFFF:
+        raise ValueError("target must be at least as large as the source and below 16 MB "
+                         "(IPS offsets and the size trailer are 24-bit)")
     out = bytearray(b"PATCH")
     i, n = 0, len(b)
     while i < n:
