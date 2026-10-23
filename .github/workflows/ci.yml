@@ -30,3 +30,14 @@ jobs:
           /tmp/wheel-venv/bin/krpatch --version
           /tmp/wheel-venv/bin/krpatch audio --help
           test -f "$(/tmp/wheel-venv/bin/krpatch snes lua)/lib.lua"
+
+  # The ci-gate ruleset requires this single check, so new jobs only need adding to `needs`.
+  ci-ok:
+    if: always()
+    needs: [test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - run: echo ok
