@@ -4,19 +4,21 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kr-patch-toolkit"
-version = "0.1.0"
-description = "Game-independent tools for translation patches: IPS, LZSS, screenshot comparison, glyph tools, and SNES mappers, 65c816 disassembler, tile rendering and a libretro test harness."
+version = "0.2.0"
+description = "Game-independent tools for translation patches: IPS, LZSS, screenshot comparison, glyph tools, seamless music loops from recordings, and SNES mappers, 65c816 disassembler, tile rendering and a libretro test harness."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "perfectacle" }]
 requires-python = ">=3.15"
-dependencies = ["Pillow>=9"]
+# numpy 2.5.2 is the first release with Python 3.15 wheels
+dependencies = ["Pillow>=9", "numpy>=2.5.2"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.15",
   "Operating System :: OS Independent",
   "Topic :: Games/Entertainment",
+  "Topic :: Multimedia :: Sound/Audio :: Analysis",
   "Topic :: Software Development :: Disassemblers",
 ]
 
@@ -33,7 +35,7 @@ Homepage = "https://github.com/perfectacle/kr-patch-toolkit"
 packages = ["src/kr_patch"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "examples", "README.md", "CHANGELOG.md", "LICENSE"]
+include = ["src", "tests", "examples", "README.md", "README.ko.md", "CHANGELOG.md", "CHANGELOG.ko.md", "LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

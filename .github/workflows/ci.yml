@@ -28,4 +28,5 @@ jobs:
           python -m venv /tmp/wheel-venv
           /tmp/wheel-venv/bin/pip install dist/*.whl
           /tmp/wheel-venv/bin/krpatch --version
+          /tmp/wheel-venv/bin/krpatch audio --help
           test -f "$(/tmp/wheel-venv/bin/krpatch snes lua)/lib.lua"

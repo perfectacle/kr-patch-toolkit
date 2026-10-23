@@ -2,13 +2,15 @@
 
 Plays a script (see harness.script) on a libretro core and writes f<frame>.png
 screenshots, end.png, optional WRAM/SRAM dumps and wram.log (frame and the
-watched WRAM values, one line per change) to the output directory.
+watched WRAM values, one line per change) to the output directory, and
+optionally the core's audio output as a 16-bit stereo WAV.
 
 env LRVARS="key=value,key=value" overrides core options; LRLOG=1 prints core logs.
 """
 import ctypes as C
 import os
 import sys
+import wave
 
 from PIL import Image
 
@@ -32,6 +34,12 @@ class LogIface(C.Structure):
 
 class GameInfo(C.Structure):
     _fields_ = [("path", C.c_char_p), ("data", C.c_void_p), ("size", C.c_size_t), ("meta", C.c_char_p)]
+
+
+class AvInfo(C.Structure):
+    _fields_ = [("base_width", C.c_uint), ("base_height", C.c_uint), ("max_width", C.c_uint),
+                ("max_height", C.c_uint), ("aspect_ratio", C.c_float), ("fps", C.c_double),
+                ("sample_rate", C.c_double)]
 
 
 def env_vars(s):
@@ -75,7 +83,7 @@ class Runner:
     """
 
     def __init__(self, core, rom, out, script, srm=None, watches=(), variables=None,
-                 verbose=None, cheat_hold=40):
+                 verbose=None, cheat_hold=40, wav=None):
         self.core_path, self.rom_path, self.out = core, rom, out
         self.script = script
         self.srm = open(srm, "rb").read() if srm else None
@@ -86,6 +94,8 @@ class Runner:
         vs.update(variables or {})
         self.vars = {k: C.c_char_p(v.encode()) for k, v in vs.items()}
         self.cheat_hold = cheat_hold
+        self.wav = wav
+        self.sink = None    # open wave writer while recording
         self.frame = 0
         self.pixfmt = PIX_0RGB1555
         self.last = None
@@ -129,14 +139,24 @@ class Runner:
             if data:
                 self.last = (C.string_at(data, pitch * h), w, h, pitch)
 
+        def audio(left, right):
+            if self.sink:
+                self.sink.writeframesraw(left.to_bytes(2, "little", signed=True)
+                                         + right.to_bytes(2, "little", signed=True))
+
+        def audio_batch(data, frames):
+            if self.sink:
+                self.sink.writeframesraw(C.string_at(data, frames * 4))
+            return frames
+
         def inp(port, device, index, id_):
             if port != 0 or device != 1:
                 return 0
             return int(id_ in self.held)
 
         # ctypes callbacks must outlive the core's use of them, i.e. until after retro_deinit
-        self._keep = (sysdir, log_fn, log_iface, ENV_CB(env), VID_CB(video), AUD_CB(lambda l, r: None),
-                      AUDB_CB(lambda d, n: n), POLL_CB(lambda: None), IN_CB(inp))
+        self._keep = (sysdir, log_fn, log_iface, ENV_CB(env), VID_CB(video), AUD_CB(audio),
+                      AUDB_CB(audio_batch), POLL_CB(lambda: None), IN_CB(inp))
         return self._keep[3:]
 
     def save_png(self, path):
@@ -177,14 +197,35 @@ class Runner:
             if not core.retro_load_game(C.byref(gi)):
                 raise LoadError("LOAD FAILED: the core rejected the ROM")
             loaded = True
+            if self.wav:
+                rate = self._sample_rate(core)
+                # streamed so long recordings do not sit in memory; close() fixes up the header
+                self.sink = wave.open(self.wav, "wb")
+                self.sink.setnchannels(2)
+                self.sink.setsampwidth(2)
+                self.sink.setframerate(round(rate))    # WAV holds an integer rate; snes9x reports 32040.5
             self._play(core)
         finally:
+            if self.sink:
+                self.sink.close()
+                self.sink = None
             if loaded:
                 core.retro_unload_game()
             core.retro_deinit()
         if self.last:
             self.save_png(os.path.join(self.out, "end.png"))
         return self.frame
+
+    def _sample_rate(self, core):
+        try:
+            get = core.retro_get_system_av_info
+        except AttributeError:
+            raise LoadError("LOAD FAILED: the core has no retro_get_system_av_info") from None
+        av = AvInfo()
+        get(C.byref(av))
+        if not av.sample_rate > 0:
+            raise LoadError(f"LOAD FAILED: the core reports a sample rate of {av.sample_rate}")
+        return av.sample_rate
 
     def _check_wram(self, size):
         for f, pokes in self.script.pokes.items():

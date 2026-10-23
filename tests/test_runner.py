@@ -1,6 +1,8 @@
 """Runner.run against a fake core: the ctypes callbacks are real, the core is Python."""
+import array
 import ctypes as C
 import ctypes.util
+import wave
 
 import pytest
 from PIL import Image
@@ -21,8 +23,8 @@ class FakeCore:
 
         def retro_set_environment(cb): core.env = cb
         def retro_set_video_refresh(cb): core.video = cb
-        def retro_set_audio_sample(cb): pass
-        def retro_set_audio_sample_batch(cb): pass
+        def retro_set_audio_sample(cb): core.audio = cb
+        def retro_set_audio_sample_batch(cb): core.audio_batch = cb
         def retro_set_input_poll(cb): pass
         def retro_set_input_state(cb): core.inp = cb
 
@@ -39,6 +41,13 @@ class FakeCore:
             core.frame += 1
             core.a_held.append(core.inp(0, 1, 0, script.BUTTONS["a"]))
             core.video(C.addressof(core.vbuf), 256, 224, 512)
+            # two stereo frames by batch, one by the single-sample callback
+            pcm = (C.c_int16 * 4)(core.frame, -core.frame, 1000, -1000)
+            core.audio_batch(C.addressof(pcm), 2)
+            core.audio(7, -7)
+
+        def retro_get_system_av_info(av):
+            av._obj.fps, av._obj.sample_rate = 60.0988, 32040.5
 
         def retro_get_memory_data(i):
             if i == libretro.MEM_SYSTEM_RAM:
@@ -85,6 +94,39 @@ def test_run_pokes_watches_dumps_shots(monkeypatch, tmp_path, rom):
     assert (out / "end.png").exists()
     # input for frame f is what the core sees during its f+1-th retro_run
     assert fake.a_held[1:5] == [0, 1, 1, 0]
+    assert fake.calls == ["init", "load", "unload", "deinit"]
+
+
+def test_wav(monkeypatch, tmp_path, rom):
+    fake = FakeCore()
+    _run(monkeypatch, tmp_path, rom, fake, ["3 end"], wav=str(tmp_path / "a.wav"))
+    with wave.open(str(tmp_path / "a.wav")) as w:
+        assert (w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()) == (2, 2, 32040, 9)
+        pcm = array.array("h", w.readframes(9))
+    assert list(pcm[:6]) == [1, -1, 1000, -1000, 7, -7]
+    assert list(pcm[12:14]) == [3, -3]
+
+
+def test_no_wav_without_option(monkeypatch, tmp_path, rom):
+    fake = FakeCore()
+    del fake.retro_get_system_av_info       # not needed unless --wav is given
+    _run(monkeypatch, tmp_path, rom, fake, ["3 end"])
+    assert not list(tmp_path.glob("**/*.wav"))
+
+
+def test_wav_is_closed_when_the_run_fails(monkeypatch, tmp_path, rom):
+    fake = FakeCore(wram_size=0x1000)
+    with pytest.raises(ValueError):
+        _run(monkeypatch, tmp_path, rom, fake, ["5 poke 0FFF 1", "10 end"], wav=str(tmp_path / "a.wav"))
+    with wave.open(str(tmp_path / "a.wav")) as w:     # header written, no frames
+        assert (w.getframerate(), w.getnframes()) == (32040, 0)
+
+
+def test_wav_needs_av_info(monkeypatch, tmp_path, rom):
+    fake = FakeCore()
+    del fake.retro_get_system_av_info
+    with pytest.raises(libretro.LoadError, match="retro_get_system_av_info"):
+        _run(monkeypatch, tmp_path, rom, fake, ["3 end"], wav=str(tmp_path / "a.wav"))
     assert fake.calls == ["init", "load", "unload", "deinit"]
 
 
