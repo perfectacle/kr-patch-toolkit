@@ -4,6 +4,29 @@ English | [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
 
+## 0.2.0
+
+Tools for recorded game music. Requires numpy 2.5.2 or newer.
+
+- `audio` (`krpatch audio ...`), never mixing channels to mono:
+  - `segments`: song boundaries from silence.
+  - `period`: candidate loop periods by spectral self-similarity of one song.
+  - `loop`: loop files with a sample-exact period and seam (earliest good
+    seam by default), an equal-gain crossfade and a tail taken from after the
+    seam; JSON output. `--legacy` reproduces files from the earlier
+    `make_loop.py` script byte for byte.
+  - `seamcheck`: spectral flux at the seam against the uncut recording on the
+    same frame grid, or against the song's 99th percentile.
+  - `loudness`: BS.1770 / EBU R128 integrated loudness of mono or stereo,
+    `null` for silence.
+  - WAV I/O uses the stdlib `wave`; unreadable or truncated files are errors.
+- `snes run --wav`: record the core's audio as 16-bit stereo WAV at the core's
+  sample rate, streamed to disk. Without the option nothing changes.
+- `lua/probe/`: APU port writes (`apuports.lua`, `APUPORTS` port filter),
+  S-DSP voice envelopes (`voices.lua`), and calls with their return address
+  (`calls.lua`).
+- The sdist includes the Korean README and changelog.
+
 ## 0.1.0
 
 First release. Requires Python 3.15.

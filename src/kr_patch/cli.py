@@ -142,6 +142,242 @@ def cmd_ocr(a):
         print(f"{k}\t{ch or '?'}")
 
 
+# audio commands (numpy is imported only here, so other commands start fast)
+
+def _span(s):
+    a, b = s.split(":")
+    return float(a), float(b)
+
+
+def _positive(kind):
+    def parse(s):
+        v = kind(s)
+        if not v > 0:
+            raise argparse.ArgumentTypeError(f"must be positive, not {s}")
+        return v
+    parse.__name__ = kind.__name__
+    return parse
+
+
+_pos_int, _pos_float = _positive(int), _positive(float)
+
+
+def _range(x, rate, start, end):
+    """First and end sample of start..end seconds (end None = end of file)."""
+    a, b = int(start * rate), len(x) if end is None else int(end * rate)
+    if not 0 <= a < b <= len(x):
+        raise ValueError(f"range {start}-{end} s is outside the {len(x) / rate:.3f} s recording")
+    return a, b
+
+
+def _json(v):
+    """JSON number, or null for -inf and NaN, which JSON cannot hold."""
+    import math
+    return round(v, 2) if math.isfinite(v) else None
+
+
+def cmd_segments(a):
+    from .audio import analysis, wav
+    x, rate = wav.read(a.wav)
+    songs, gaps = analysis.segments(x, rate, a.window, a.threshold, a.min_gap)
+    for s, e in gaps if a.gaps else songs:
+        print(f"{s:9.2f} {e:9.2f} {e - s:9.2f}")
+
+
+def cmd_period(a):
+    from .audio import analysis, wav
+    x, rate = wav.read(a.wav)
+    lo, hi = _range(x, rate, a.start, a.end)
+    cands = analysis.period_candidates(analysis.as_float(x[lo:hi]), rate, a.min_lag, a.range, a.top, a.fft, a.hop)
+    for lag, score in cands:
+        print(f"{lag / rate:10.3f} s {lag:10d} samples  sim={score:.4f}")
+    print(f"resolution {a.hop} samples; a peak may be a multiple or a fraction of the true period, "
+          "check it by ear or with `krpatch audio loop --period-range`", file=sys.stderr)
+
+
+LOOP_DEFAULTS = {"fade_shape": "equal-gain", "tail_from": "seam", "seam_pick": "earliest"}
+LOOP_LEGACY = {"fade_shape": "equal-power", "tail_from": "end", "seam_pick": "best"}
+
+
+def cmd_loop(a):
+    import json
+    from .audio import analysis, loop, wav
+    if a.period and a.period_range:
+        raise ValueError("pass --period or --period-range, not both")
+    for k, v in (LOOP_LEGACY if a.legacy else LOOP_DEFAULTS).items():
+        if getattr(a, k) is None:
+            setattr(a, k, v)
+    x, rate = wav.read(a.wav)
+    A, end = _range(x, rate, a.start, a.end)
+    if a.end is None:
+        songs = analysis.segments(x[A:end], rate)[0]
+        if len(songs) > 1:
+            print(f"warning: {len(songs)} songs separated by silence after --start (next at "
+                  f"{a.start + songs[1][0]:.2f} s); pass --end to keep the search inside one song",
+                  file=sys.stderr)
+    win, coarse = int(a.window / 2 * rate), int(a.coarse_step * rate)
+    P, pscore = a.period, None
+    if not P:
+        f = analysis.as_float(x)
+        lag, _ = analysis.period_candidates(f[A:end], rate, a.min_lag, a.period_range, 1)[0]
+        P, pscore = analysis.refine_period(f, rate, lag, A, end, a.refine_length)
+        print(f"period {P} samples ({P / rate:.5f} s), waveform ncc {pscore:.4f}", file=sys.stderr)
+    margin = win + coarse + a.snap
+    if a.seam_range:
+        t0, t1 = int(a.seam_range[0] * rate), int(a.seam_range[1] * rate)
+    else:
+        t0, t1 = A + margin, end - P - margin - a.snap_len
+    if t0 < margin or t1 + P + margin + a.snap_len > end or t1 <= t0:
+        raise ValueError("the seam range needs a full period plus the search window after it before --end "
+                         "(or the end of the recording); record longer or narrow --seam-range")
+    seam = loop.Seam(x, P, win, legacy=a.legacy)
+    T = seam.find(t0, t1, coarse, a.fine_step, a.snap, a.snap_len,
+                  None if a.seam_pick == "best" else a.seam_delta)
+    tail, fade = int(a.tail * rate), int(a.fade_ms / 1000 * rate)
+    E = T + P
+    if (T if a.tail_from == "seam" else E) + tail > end:
+        raise ValueError(f"--tail {a.tail} s does not fit before --end (or the end of the recording)")
+    if T - fade < A:
+        raise ValueError("the crossfade would reach before --start; lower --fade-ms or move the seam later")
+    wav.write(a.out, loop.render(x, A, T, P, fade, tail, a.fade_shape, a.tail_from), rate)
+    meta = {"loopStart": round((T - A) / rate, 6), "loopEnd": round((E - A) / rate, 6),
+            "duration": round((E + tail - A) / rate, 6),
+            "loopStartSample": T - A, "loopEndSample": E - A, "loopLengthSample": P,
+            "durationSamples": E + tail - A, "sampleRate": rate, "period": P, "sourceStartSample": A,
+            "seamScore": round(seam.score(T), 4)}
+    if pscore is not None:
+        meta["periodScore"] = round(pscore, 4)
+    text = json.dumps(meta)
+    if a.json:
+        Path(a.json).write_text(text + "\n")
+    print(text)
+
+
+def cmd_seamcheck(a):
+    import json
+    from .audio import loop, wav
+    y, rate = wav.read(a.wav)
+    meta = json.loads(Path(a.json or Path(a.wav).with_suffix(".json")).read_text())
+
+    def sample(key):
+        if key + "Sample" in meta:
+            return int(meta[key + "Sample"])
+        if key in meta:
+            return round(meta[key] * rate)
+        raise ValueError(f"the loop JSON has neither {key} nor {key}Sample")
+
+    s, e = sample("loopStart"), sample("loopEnd")
+    if not 0 <= s < e <= len(y):
+        raise ValueError(f"loop {s}-{e} is outside the {len(y)}-sample file")
+    src = start = None
+    if a.source:
+        src, srate = wav.read(a.source)
+        if srate != rate:
+            raise ValueError(f"{a.source}: {srate} Hz, loop file {rate} Hz")
+        start = int(a.source_start * rate) if a.source_start is not None else meta.get("sourceStartSample")
+        if start is None:
+            raise ValueError("--source needs --source-start when the loop JSON has no sourceStartSample")
+    res, z = loop.check(y, rate, s, e, src, start, a.ratio)
+    if a.render:
+        wav.write(a.render, z, rate)
+    print(json.dumps(res))
+    sys.exit(0 if res["ok"] else 1)
+
+
+def cmd_loudness(a):
+    import json
+    from .audio import loudness, wav
+    x, rate = wav.read(a.wav)
+    lo, hi = _range(x, rate, a.start, a.end)
+    f = x[lo:hi] / 32768
+    lufs = loudness.integrated(f, rate)
+    res = {"integrated": _json(lufs), "samplePeak": _json(loudness.sample_peak(f))}
+    if a.target is not None and res["integrated"] is not None:
+        res["gain"] = round(a.target - lufs, 2)
+    print(json.dumps(res))
+
+
+def _audio_parser(sub):
+    au = sub.add_parser("audio", help="analyse recordings and make seamless loops (16-bit WAV)").add_subparsers(
+        dest="audio_cmd", required=True, metavar="command")
+
+    p = au.add_parser("segments", help="songs separated by silence: start, end, length in seconds")
+    p.add_argument("wav")
+    p.add_argument("--window", type=_pos_float, default=0.05, help="RMS window in seconds (default 0.05)")
+    p.add_argument("--threshold", type=float, default=30,
+                   help="RMS over all channels below this (int16 units) is quiet (default 30)")
+    p.add_argument("--min-gap", type=_pos_float, default=0.3, help="seconds of quiet that separate songs (default 0.3)")
+    p.add_argument("--gaps", action="store_true", help="print the quiet gaps instead of the songs")
+    p.set_defaults(fn=cmd_segments)
+
+    p = au.add_parser("period", help="candidate loop periods by spectral self-similarity",
+                      description="Candidate loop periods by spectral self-similarity. Give one song's range "
+                                  "(--start/--end, e.g. from `krpatch audio segments`): over several songs "
+                                  "or the silence after one, long lags that span them win.")
+    p.add_argument("wav")
+    p.add_argument("--start", type=float, default=0.0, help="song start in seconds")
+    p.add_argument("--end", type=_pos_float, help="song end in seconds (default: end of file)")
+    p.add_argument("--min-lag", type=_pos_float, default=5.0, help="shortest lag and overlap in seconds (default 5)")
+    p.add_argument("--range", type=_span, metavar="LO:HI", help="only lags within LO..HI seconds")
+    p.add_argument("--top", type=_pos_int, default=6)
+    p.add_argument("--fft", type=_pos_int, default=2048, help="FFT size (default 2048)")
+    p.add_argument("--hop", type=_pos_int, default=512, help="frame step in samples (default 512)")
+    p.set_defaults(fn=cmd_period)
+
+    p = au.add_parser("loop", help="find the seam and write a loop file; prints JSON")
+    p.add_argument("wav")
+    p.add_argument("out", help="loop WAV to write")
+    p.add_argument("--start", type=float, default=0.0, help="song start in seconds; the file begins here")
+    p.add_argument("--end", type=_pos_float, help="end of the song in seconds (default: end of file)")
+    p.add_argument("--period", type=_pos_int, help="known period in samples (skips the period search)")
+    p.add_argument("--period-range", type=_span, metavar="LO:HI", help="search the period within LO..HI seconds")
+    p.add_argument("--min-lag", type=_pos_float, default=5.0, help="shortest period searched, seconds (default 5)")
+    p.add_argument("--refine-length", type=_pos_float, default=3.0,
+                   help="seconds of waveform matched to refine the period (default 3)")
+    p.add_argument("--seam-range", type=_span, metavar="FROM:TO",
+                   help="search the seam between these seconds of the recording (default: all that fits)")
+    p.add_argument("--seam-pick", choices=("earliest", "best"),
+                   help="earliest position within --seam-delta of the best score (default), or the best")
+    p.add_argument("--seam-delta", type=_pos_float, default=0.003, help="score margin for earliest (default 0.003)")
+    p.add_argument("--window", type=_pos_float, default=0.5, help="seam match window in seconds (default 0.5)")
+    p.add_argument("--coarse-step", type=_pos_float, default=0.05, help="coarse seam step in seconds (default 0.05)")
+    p.add_argument("--fine-step", type=_pos_int, default=16, help="fine seam step in samples (default 16)")
+    p.add_argument("--snap", type=_pos_int, default=200, help="final search +- samples (default 200)")
+    p.add_argument("--snap-len", type=_pos_int, default=64, help="samples compared in the final search (default 64)")
+    p.add_argument("--fade-ms", type=_pos_float, default=60, help="crossfade before loopEnd (default 60)")
+    p.add_argument("--fade-shape", choices=("equal-gain", "equal-power"),
+                   help="equal-gain (sin^2, default) suits a seam whose sides match; equal-power (sin/cos) "
+                        "is 3 dB louder mid-fade on such audio")
+    p.add_argument("--tail", type=float, default=0.5, help="seconds kept after loopEnd (default 0.5)")
+    p.add_argument("--tail-from", choices=("seam", "end"),
+                   help="tail is the audio after the seam, as heard after the jump (default), "
+                        "or what followed loopEnd in the recording")
+    p.add_argument("--legacy", action="store_true",
+                   help="behave like the make_loop.py script: equal-power fade, tail from the end, best seam, "
+                        "seam score on the channel sum")
+    p.add_argument("--json", metavar="PATH", help="also write the JSON here")
+    p.set_defaults(fn=cmd_loop)
+
+    p = au.add_parser("seamcheck",
+                      help="spectral flux at the loop jump vs the uncut recording or the song; exit 1 if louder")
+    p.add_argument("wav", help="loop WAV")
+    p.add_argument("--json", metavar="PATH", help="loop JSON (default: WAV path with .json)")
+    p.add_argument("--source", metavar="WAV", help="original recording, to measure the uncut continuation")
+    p.add_argument("--source-start", type=float, help="seconds where the loop file starts in --source "
+                                                      "(default: sourceStartSample from the JSON)")
+    p.add_argument("--ratio", type=_pos_float, default=1.25,
+                   help="pass while the seam flux is at most this times the reference (default 1.25)")
+    p.add_argument("--render", metavar="OUT.wav", help="write the intro and the loop three times (two jumps)")
+    p.set_defaults(fn=cmd_seamcheck)
+
+    p = au.add_parser("loudness", help="integrated loudness (BS.1770 / EBU R128) and sample peak; prints JSON")
+    p.add_argument("wav")
+    p.add_argument("--start", type=float, default=0.0, help="seconds")
+    p.add_argument("--end", type=_pos_float, help="seconds (default: end of file)")
+    p.add_argument("--target", type=float, metavar="LUFS", help="also print the gain in dB to reach this")
+    p.set_defaults(fn=cmd_loudness)
+
+
 # SNES commands
 
 def _mapper(name, rom):
@@ -208,7 +444,7 @@ def cmd_run(a):
     watches = [script.Watch.parse(w, a.watch_fmt) for w in a.watch]
     variables = dict(v.split("=", 1) for v in a.var)
     r = libretro.Runner(a.core, a.rom, a.out, script.load(a.script), a.srm, watches, variables,
-                        verbose=a.verbose or None, cheat_hold=a.cheat_hold)
+                        verbose=a.verbose or None, cheat_hold=a.cheat_hold, wav=a.wav)
     try:
         n = r.run()
     except libretro.LoadError as e:
@@ -288,6 +524,7 @@ def _snes_parser(sub):
     p.add_argument("--var", action="append", default=[], metavar="KEY=VALUE", help="core option")
     p.add_argument("--cheat-hold", type=int, default=40,
                    help="frames a poke is held as a cheat on cores without a WRAM pointer")
+    p.add_argument("--wav", metavar="OUT.wav", help="record the core's audio (16-bit stereo, the core's sample rate)")
     p.add_argument("-v", "--verbose", action="store_true", help="print core log and environment calls")
     p.set_defaults(fn=cmd_run)
 
@@ -365,6 +602,7 @@ def build_parser():
     p.add_argument("--fix-mo", action="store_true", help="re-decide ㅁ/ㅇ from glyph corners (pixel fonts only)")
     p.set_defaults(fn=cmd_ocr)
 
+    _audio_parser(sub)
     _snes_parser(sub)
     return ap
 

@@ -4,7 +4,8 @@ English | [한국어](README.ko.md)
 
 Game-independent tools for building and testing translation patches. Some are
 platform-independent (IPS patches, an LZSS codec, file diffs, screenshot
-comparison, bitmap glyph tools with macOS OCR); the rest are for the SNES
+comparison, bitmap glyph tools with macOS OCR, seamless music loops cut from
+recordings); the rest are for the SNES
 (Super Famicom): cartridge mappers, header checksums, a 65c816 disassembler,
 tile and BG rendering, a headless libretro test runner and Mesen 2 Lua scripts.
 Other platforms (NDS first) are planned and will get their own `krpatch <platform>`
@@ -21,7 +22,7 @@ No ROM data is included. The tests build tiny synthetic ROM images.
 Python 3.15 or newer.
 
 ```sh
-pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.1.0
+pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.2.0
 ```
 
 This installs the `krpatch` command and the `kr_patch` package. Pin the tag in
@@ -42,6 +43,7 @@ Addresses and offsets are hex unless stated otherwise.
 | `krpatch contact` | contact sheet of screenshots |
 | `krpatch glyph show\|make\|set` | bitmap glyphs in a JSON store |
 | `krpatch ocr` | read glyphs with macOS Vision |
+| `krpatch audio segments\|period\|loop\|seamcheck\|loudness` | song boundaries, loop period, loop files, loudness |
 | `krpatch snes dis` | disassemble 65c816 code |
 | `krpatch snes checksum` | check or fix the internal header checksum |
 | `krpatch snes tiles` | render planar tiles |
@@ -117,6 +119,97 @@ helper (`ocr.swift`) is compiled with `xcrun swiftc` on first use into
 it suits pixel fonts that draw ㅁ with filled corners and ㅇ without, and can
 turn correct results wrong on smooth fonts.
 
+### `audio`: seamless loops from recordings
+
+For game music recorded from an emulator, e.g. with `krpatch snes run --wav`.
+Input is 16-bit PCM WAV; times are in seconds unless stated otherwise.
+Channels are never mixed to mono, so a voice panned in anti-phase still
+counts.
+
+```sh
+krpatch audio segments rec.wav                                   # songs: start, end, length
+krpatch audio period rec.wav --start 36.4 --end 250.25           # candidate periods of one song
+krpatch audio loop rec.wav song.wav --start 36.4 --end 250.25 --period-range 100:115 --json song.json
+krpatch audio loop rec.wav song.wav --start 36.4 --end 250.25 --period 5136108 --seam-range 40:70
+krpatch audio seamcheck song.wav --source rec.wav --render check.wav
+krpatch audio loudness song.wav --target -20
+```
+
+`segments` splits the recording at silence: 50 ms windows (`--window`) whose
+RMS over all channels is below 30 (`--threshold`, in int16 units) for at least
+0.3 s (`--min-gap`). `--gaps` prints the silent stretches instead of the songs.
+
+`period` compares the log spectrum (2048-point FFT every 512 samples) of the
+range with itself shifted by every lag of at least `--min-lag` (5 s), averaged
+over channels, and prints the best lags. Give it one song's range from
+`segments`: over several songs, or a song and the silence after it, long lags
+that span them win. It tolerates repeats whose waveforms differ, but its
+resolution is one hop (about 11 ms at 48 kHz), and a peak can be a multiple or
+a fraction of the true period when the music repeats a phrase inside its loop.
+Pick by ear, then pass `--range` or `loop --period-range`.
+
+`loop` writes the song from `--start` to loopEnd plus a tail, and prints:
+
+```json
+{"loopStart": 6.651625, "loopEnd": 113.653875, "duration": 114.153875,
+ "loopStartSample": 319278, "loopEndSample": 5455386, "loopLengthSample": 5136108,
+ "durationSamples": 5479386, "sampleRate": 48000, "period": 5136108,
+ "sourceStartSample": 1747200, "seamScore": 0.9983}
+```
+
+Positions are relative to the written file; `loopEndSample` is exclusive, so
+the loop is samples `loopStartSample` to `loopEndSample - 1`, and
+`loopLengthSample` is the period. `sourceStartSample` is where the file starts
+in the recording.
+
+- Period: `--period` (samples), or the best `period` lag within
+  `--period-range` (or from `--min-lag` up), refined to the sample by matching
+  3 s of waveform (`--refine-length`) one period later at seven places in the
+  range; `periodScore` is that match.
+- Seam T: where 0.5 s around T (`--window`) best matches 0.5 s around T +
+  period, all channels together. First in 50 ms steps over `--seam-range`
+  (default: everything in the recording that fits before `--end`), then in
+  16-sample steps, then the sample within ±200 where 64 samples on both sides
+  differ least. The coarse pick is the earliest position scoring within 0.003
+  of the best (`--seam-delta`), since any seam inside the repeating part loops
+  cleanly and an early one keeps the file short; `--seam-pick best` takes the
+  best instead. `seamScore` is the match at T: close to 1 when repeats are
+  nearly identical, lower (around 0.9) when voices differ slightly between
+  repeats.
+- Crossfade: the 60 ms before loopEnd (`--fade-ms`) fade into the 60 ms before
+  T, so the jump lands in audio that already sounds like what follows T. The
+  default `--fade-shape equal-gain` (sin² in, 1 − sin² out) keeps the level
+  when both sides match, as they do at a good seam; `equal-power` (sin/cos) is
+  up to 3 dB louder mid-fade on such audio.
+- Tail: 0.5 s (`--tail`) of what follows T, i.e. what a player hears after the
+  jump. It keeps a lossy encoder's padding out of the loop, so players must
+  loop on `loopStart`/`loopEnd`, not on the file end. `--tail-from end` takes
+  what followed loopEnd in the recording instead.
+- Without `--end`, `loop` warns when `segments` finds more than one song after
+  `--start`.
+- `--legacy` behaves like the script these commands replace: equal-power fade,
+  tail from the end, best seam, and the seam score on the channel sum. It
+  reproduces loop files made with that script byte for byte.
+
+`seamcheck` plays the intro and the loop three times, i.e. two jumps, the way
+a player would (`--render` writes it), and measures spectral flux, i.e. how
+sharply the sound rises, at the first jump. With `--source` it also measures
+the uncut recording over the same frames, where the song simply continues past
+loopEnd (the file's start comes from `sourceStartSample` in the JSON, or
+`--source-start`); both use the same frame grid, so an exact loop measures the
+same as its source. It prints JSON and exits 1 when the seam is above 1.25
+times (`--ratio`) that continuation, or, without a source, above 1.25 times the
+song's 99th percentile. A loop that starts on a drum hit is loud at the seam
+either way, so prefer `--source`.
+
+`loudness` prints integrated loudness by ITU-R BS.1770-4 / EBU R128
+(K-weighting, 400 ms blocks, -70 LUFS absolute and -10 LU relative gates) for
+mono or stereo, and the sample peak; `--target LUFS` adds the gain that reaches
+it. Silence prints `null` for both and no gain. True peak is not measured: use
+`ffmpeg -i song.wav -af ebur128=peak=true -f null -`.
+
+Unreadable or truncated WAV files are an error (exit 2).
+
 ## SNES commands
 
 ### `snes dis`: disassemble 65c816 code
@@ -180,6 +273,10 @@ and exits with status 3. Run one script per process: cores keep global state.
   core log (the core's format strings are printed without their arguments).
 - `save.srm` is copied to the save RAM after loading and again after the first
   frame, and written to `out/<rom name>.srm` for cores that read it from disk.
+- `--wav OUT.wav`: record the core's audio output, 16-bit stereo at the sample
+  rate the core reports (bsnes 48000 Hz; snes9x reports 32040.5 Hz, which the
+  WAV header rounds to an integer). Samples are written as they arrive, so long
+  recordings do not stay in memory.
 
 Script format, one command per line, frames counted from power-on:
 
@@ -219,7 +316,10 @@ Run them with `Mesen --testrunner rom.sfc <script>` and `LIBDIR=$(krpatch snes l
 | `seq.lua` | replays `SEQ="btn:frames,wait:frames"` from a savestate with `POKE`/`WATCH` |
 | `poke_state.lua` | loads `STATE`, writes `POKE` once, saves to `OUT` |
 | `dumpsrm.lua` | writes the save RAM of a savestate to `save.srm` |
-| `probe/*.lua` | `watch`, `peek`, `wtrace`, `wdump`, `wrange`, `swatch`, `cgram`, `trace`, `regs`, `ppu`; each lists its env variables in its first lines and runs `boot.lua` for input |
+| `probe/*.lua` | `watch`, `peek`, `wtrace`, `wdump`, `wrange`, `swatch`, `cgram`, `trace`, `regs`, `ppu`, `apuports`, `voices`, `calls`; each lists its env variables in its first lines and runs `boot.lua` for input |
+| `probe/apuports.lua` | writes to the APU ports `$2140-$2143` that change a value, with frame and PC: song and sound effect commands; `APUPORTS="1,3"` logs only those ports |
+| `probe/voices.lua` | envelope level of the eight S-DSP voices every `VSTEP` frames |
+| `probe/calls.lua` | each call of the `CALLS` addresses with A, X, Y and the return address |
 
 All write their output files to `SHOT_DIR`. Use `WATCH_WRAM`, not `WATCH`, for
 `script.lua`: zsh treats `WATCH` and `WATCHFMT` as its own parameters.
@@ -236,6 +336,11 @@ mp = header.detect(rom)                 # LoROM / HiROM / ExHiROM / SA1
 print(disasm(rom, 0x808000, 20, mapper=mp))
 fixed, csum = header.fix(rom, mp)
 patch = ips.make(rom, fixed)
+
+from kr_patch.audio import loudness, wav
+
+x, rate = wav.read("song.wav")          # int16, shape (frames, channels)
+print(loudness.integrated(x / 32768, rate))
 ```
 
 ## Planned
