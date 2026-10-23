@@ -1,5 +1,7 @@
 # Changelog
 
+English | [한국어](CHANGELOG.ko.md)
+
 ## Unreleased
 
 ## 0.1.0

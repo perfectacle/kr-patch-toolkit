@@ -1,5 +1,7 @@
 # kr-patch-toolkit
 
+English | [한국어](README.ko.md)
+
 Game-independent tools for building and testing translation patches. Some are
 platform-independent (IPS patches, an LZSS codec, file diffs, screenshot
 comparison, bitmap glyph tools with macOS OCR); the rest are for the SNES
@@ -252,17 +254,3 @@ uv venv -p 3.15.0 .venv && uv pip install -p .venv -e '.[test]'
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
-## 한국어 요약
-
-한글 패치를 만들고 검증할 때 게임마다 복사해 쓰던 공통 도구를 한 패키지로
-모았습니다. 기종과 무관한 도구(IPS 생성·적용, LZSS 압축, 파일 비교,
-스크린샷 비교, 글리프 편집과 macOS Vision OCR)는 `krpatch` 바로 아래에,
-슈퍼패미컴 전용 도구(매퍼 주소 변환, 헤더 체크섬, 65c816 디스어셈블러,
-타일·BG 렌더링, libretro 헤드리스 실행기, Mesen 2 Lua 스크립트)는
-`krpatch snes` 아래에 있습니다. NDS 등 다른 기종은 나중에 추가할 예정입니다.
-
-- 설치: `pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.1.0`
-- 명령: `krpatch ips | lzss | diff | shotcmp | contact | glyph | ocr`, `krpatch snes dis | checksum | tiles | bg | bgrefs | run | lua`
-- 게임마다 다른 값(주소, 감시할 RAM 등)은 인자로 넘깁니다. 게임 저장소의 `game.toml` 로 받는 방식은 계획 중입니다.
-- 롬 데이터와 대본은 들어 있지 않습니다. 테스트는 직접 만든 작은 합성 롬으로 돌립니다.
