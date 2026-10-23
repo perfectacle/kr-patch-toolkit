@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sfc-kr-toolkit"
+version = "0.1.0"
+description = "Game-independent tools for SNES (Super Famicom) translation patches: mappers, IPS, 65c816 disassembler, LZSS, tile rendering, libretro test harness."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "perfectacle" }]
+requires-python = ">=3.9"
+dependencies = ["Pillow>=9"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+  "Topic :: Games/Entertainment",
+  "Topic :: Software Development :: Disassemblers",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+sfckr = "sfc_kr.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/perfectacle/sfc-kr-toolkit"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sfc_kr"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"lua" = "sfc_kr/lua"
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "lua", "tests", "examples", "README.md", "CHANGELOG.md", "LICENSE"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

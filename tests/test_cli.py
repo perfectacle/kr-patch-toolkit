@@ -1,0 +1,113 @@
+import pytest
+from PIL import Image
+
+from sfc_kr import cli
+from sfc_kr.codec import lzss
+from sfc_kr.gfx import tiles
+
+
+def run(capsys, *args):
+    code = 0
+    try:
+        cli.main([str(a) for a in args])
+    except SystemExit as e:
+        code = e.code or 0
+    return code, capsys.readouterr().out
+
+
+def test_ips_make_apply(tmp_path, capsys, rom_factory):
+    a = rom_factory("lorom")
+    b = bytearray(a)
+    b[0x100:0x110] = b"\x11" * 16
+    (tmp_path / "a.sfc").write_bytes(a)
+    (tmp_path / "b.sfc").write_bytes(bytes(b))
+    code, out = run(capsys, "ips", "make", tmp_path / "a.sfc", tmp_path / "b.sfc", tmp_path / "p.ips",
+                    "--headered", tmp_path / "ph.ips")
+    assert code == 0 and "p.ips" in out and "ph.ips" in out
+    run(capsys, "ips", "apply", tmp_path / "a.sfc", tmp_path / "p.ips", tmp_path / "c.sfc")
+    assert (tmp_path / "c.sfc").read_bytes() == bytes(b)
+
+
+def test_checksum(tmp_path, capsys, rom_factory):
+    rom = bytearray(rom_factory("hirom"))
+    p = tmp_path / "r.sfc"
+    p.write_bytes(bytes(rom))
+    code, out = run(capsys, "checksum", p)
+    assert code == 0 and out.startswith("hirom") and out.rstrip().endswith("ok")
+    rom[0x1000] ^= 0xFF
+    p.write_bytes(b"\0" * 512 + bytes(rom))
+    code, out = run(capsys, "checksum", p)
+    assert code == 1 and "BAD" in out
+    code, out = run(capsys, "checksum", p, "--fix")
+    assert out.startswith("checksum ")
+    assert run(capsys, "checksum", p)[0] == 0
+    assert p.read_bytes()[:512] == b"\0" * 512
+
+
+def test_dis(tmp_path, capsys, rom_factory):
+    p = tmp_path / "r.sfc"
+    p.write_bytes(rom_factory("lorom", code=bytes.fromhex("C230A93412"), code_at=0x808000))
+    code, out = run(capsys, "dis", p, "808000", "2")
+    assert out.splitlines() == ["80:8000  c2 30        REP #$30", "80:8002  a9 34 12     LDA #$1234"]
+    code, out = run(capsys, "dis", p, "808002", "1", "--m16", "--mapper", "lorom")
+    assert out.strip().endswith("LDA #$1234")
+
+
+def test_lz(tmp_path, capsys):
+    data = tiles.encode([[1, 2, 3, 0, 1, 2, 3, 0]] * 8, 2) * 4
+    (tmp_path / "in.bin").write_bytes(data)
+    run(capsys, "lz", "encode", tmp_path / "in.bin", tmp_path / "c.bin", "--planar")
+    c = (tmp_path / "c.bin").read_bytes()
+    assert lzss.decompress(c)[0] == lzss.snes_to_planar(data)
+    (tmp_path / "rom.bin").write_bytes(b"\xAA" * 16 + c)
+    code, out = run(capsys, "lz", "decode", tmp_path / "rom.bin", "10", tmp_path / "d.bin", "--planar")
+    assert (tmp_path / "d.bin").read_bytes() == data
+
+
+def test_tiles_bg_bgrefs(tmp_path, capsys):
+    data = tiles.encode([[3] * 8] * 8, 2) * 10
+    (tmp_path / "t.bin").write_bytes(data)
+    run(capsys, "tiles", tmp_path / "t.bin", "0", "A0", tmp_path / "t.png", "--cols", "5", "--scale", "1")
+    assert Image.open(tmp_path / "t.png").size == (45, 18)
+    (tmp_path / "vram.bin").write_bytes(bytes(0x10000))
+    (tmp_path / "cg.bin").write_bytes(bytes(512))
+    run(capsys, "bg", tmp_path / "vram.bin", tmp_path / "cg.bin", "0", "0x1000", "4", tmp_path / "bg.png", "--scale", "1")
+    assert Image.open(tmp_path / "bg.png").size == (256, 256)
+    code, out = run(capsys, "bgrefs", tmp_path / "vram.bin", "--layer", "0:0x1000:4", "--range", "2000-2FFF")
+    assert out.strip() == "BG1 tiles->2000-2FFF: 1 2000-201F"
+
+
+def test_diff(tmp_path, capsys):
+    (tmp_path / "a").write_bytes(bytes(64))
+    (tmp_path / "b").write_bytes(bytes(10) + b"\x01" + bytes(53))
+    assert run(capsys, "diff", tmp_path / "a", tmp_path / "b")[1].split() == ["00000A-00000A", "1"]
+
+
+def test_shotcmp_exit_status(tmp_path, capsys):
+    Image.new("RGB", (4, 4)).save(tmp_path / "a.png")
+    Image.new("RGB", (4, 4), (9, 9, 9)).save(tmp_path / "b.png")
+    assert run(capsys, "shotcmp", tmp_path / "a.png", tmp_path / "a.png")[0] == 0
+    code, out = run(capsys, "shotcmp", tmp_path / "a.png", tmp_path / "b.png", "--crop", tmp_path / "c.png")
+    assert code == 1 and "diff px=16" in out
+    assert Image.open(tmp_path / "c.png").size == (4, 4)
+
+
+def test_glyph(tmp_path, capsys):
+    store = tmp_path / "g.json"
+    run(capsys, "glyph", "set", store, "가", "##..", "#...")
+    run(capsys, "glyph", "set", store, "나", "..##", "...#")
+    code, out = run(capsys, "glyph", "make", store, "다", "가", "x=나:0-1,2-3")
+    assert out.splitlines()[1].startswith("####")
+    code, out = run(capsys, "glyph", "show", store, "다")
+    assert out.splitlines() == ["다", "####", "#..#"]
+
+
+def test_run_rejects_bad_script(tmp_path):
+    (tmp_path / "s.txt").write_text("10 jump 4\n")
+    with pytest.raises(ValueError):
+        cli.main(["run", "nocore", "norom", str(tmp_path / "out"), str(tmp_path / "s.txt")])
+
+
+def test_lua_dir(capsys):
+    code, out = run(capsys, "lua")
+    assert out.strip().endswith("lua")
