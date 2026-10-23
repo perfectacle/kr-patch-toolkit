@@ -258,8 +258,10 @@ class Runner:
                     if wram:
                         C.memmove(wram + a, bytes([v & 0xFF, v >> 8]), 2)
                         continue
-                    # bsnes and Supafaust expose no WRAM pointer. Their cheats patch
-                    # reads, so hold the value long enough for the game to read it.
+                    # bsnes and Supafaust expose no WRAM pointer, so fall back to cheats.
+                    # bsnes writes each enabled code to its address once per frame; hold
+                    # it long enough to win over the game's own writes. After release the
+                    # value stays until the game overwrites it.
                     for code in S.par_codes(a, v):
                         core.retro_cheat_set(next_cheat, True, code.encode())
                         cheats[next_cheat] = (f + self.cheat_hold, code)
