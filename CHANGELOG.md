@@ -4,7 +4,7 @@
 
 ## 0.1.0
 
-First release.
+First release. Requires Python 3.15.
 
 - `sfc_kr.rom`: LoROM, HiROM, ExHiROM and SA-1 mappers; header detection,
   checksum check and fix (with mirroring for non-power-of-two sizes); copier

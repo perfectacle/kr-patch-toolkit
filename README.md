@@ -13,7 +13,7 @@ No ROM data is included. The tests build tiny synthetic ROM images.
 
 ## Install
 
-Python 3.9 or newer.
+Python 3.15 or newer.
 
 ```sh
 pip install git+https://github.com/perfectacle/sfc-kr-toolkit@v0.1.0
@@ -208,7 +208,7 @@ implemented yet.
 ## Development
 
 ```sh
-python3 -m venv .venv && .venv/bin/pip install -e '.[test]'
+uv venv -p 3.15.0 .venv && uv pip install -p .venv -e '.[test]'
 .venv/bin/python -m pytest
 ```
 
