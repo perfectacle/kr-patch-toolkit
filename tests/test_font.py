@@ -2,7 +2,8 @@ import sys
 
 import pytest
 
-from sfc_kr.font import glyphs, hangul
+from kr_patch.glyph import hangul
+from kr_patch.glyph import store as glyphs
 
 
 def test_store_round_trip(tmp_path):
@@ -54,7 +55,7 @@ def test_fix_mieum_ieung():
 
 def test_ocr_row_image():
     pytest.importorskip("PIL")
-    from sfc_kr.font import ocr
+    from kr_patch.glyph import ocr
     g = glyphs.parse(["#.", ".#"])
     im = ocr.row_image([g, g], scale=4, margin=2, spacing=1)
     assert im.size == ((2 + 1) * 2 * 4 + 4, 2 * 4 + 4)
@@ -63,6 +64,6 @@ def test_ocr_row_image():
 
 @pytest.mark.skipif(sys.platform == "darwin", reason="checks the non-macOS error path")
 def test_ocr_needs_macos():
-    from sfc_kr.font import ocr
+    from kr_patch.glyph import ocr
     with pytest.raises(RuntimeError):
         ocr.binary()

@@ -45,7 +45,8 @@ def contact(pattern, out, cols=10, scale=0.5, label=10):
     fs = sorted(glob.glob(pattern))
     if not fs:
         raise ValueError(f"no files match {pattern}")
-    w, h = int(256 * scale), int(224 * scale)
+    w0, h0 = Image.open(fs[0]).size
+    w, h = int(w0 * scale), int(h0 * scale)
     im = Image.new("RGB", (cols * w, ((len(fs) + cols - 1) // cols) * (h + label)), "gray")
     d = ImageDraw.Draw(im)
     for i, f in enumerate(fs):

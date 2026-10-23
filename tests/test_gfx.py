@@ -1,6 +1,6 @@
 import pytest
 
-from sfc_kr.gfx import bg, tiles
+from kr_patch.snes import bg, tiles
 
 # a diagonal with every colour index of the depth
 def _pattern(bpp, rows=8):

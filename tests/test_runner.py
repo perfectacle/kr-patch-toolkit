@@ -5,7 +5,7 @@ import ctypes.util
 import pytest
 from PIL import Image
 
-from sfc_kr.harness import libretro, script
+from kr_patch.snes import libretro, script
 
 
 class FakeCore:

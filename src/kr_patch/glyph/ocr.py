@@ -16,14 +16,14 @@ SWIFT = Path(__file__).with_name("ocr.swift")
 
 def _cache():
     base = os.getenv("XDG_CACHE_HOME") or os.path.join(Path.home(), ".cache")
-    return Path(base) / "sfc-kr-toolkit"
+    return Path(base) / "kr-patch-toolkit"
 
 
 def binary():
     """Path of the compiled Vision helper, building it when missing or stale."""
     if sys.platform != "darwin":
         raise RuntimeError("OCR needs macOS (Vision framework)")
-    exe = _cache() / "sfckr-ocr"
+    exe = _cache() / "krpatch-ocr"
     if not exe.exists() or exe.stat().st_mtime < SWIFT.stat().st_mtime:
         exe.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(["xcrun", "swiftc", "-O", str(SWIFT), "-o", str(exe)], check=True)

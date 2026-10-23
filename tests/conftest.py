@@ -1,7 +1,7 @@
 """Synthetic ROM images: a valid internal header, a reset vector and some code."""
 import pytest
 
-from sfc_kr.rom import header, mapper
+from kr_patch.snes import header, mapper
 
 MODES = {"lorom": 0x20, "hirom": 0x21, "sa1": 0x23, "exhirom": 0x25}
 

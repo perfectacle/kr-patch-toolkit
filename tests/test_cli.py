@@ -1,9 +1,8 @@
 import pytest
 from PIL import Image
 
-from sfc_kr import cli
-from sfc_kr.codec import lzss
-from sfc_kr.gfx import tiles
+from kr_patch import cli, lzss
+from kr_patch.snes import tiles
 
 
 def run(capsys, *args, err=False):
@@ -33,48 +32,48 @@ def test_checksum(tmp_path, capsys, rom_factory):
     rom = bytearray(rom_factory("hirom"))
     p = tmp_path / "r.sfc"
     p.write_bytes(bytes(rom))
-    code, out = run(capsys, "checksum", p)
+    code, out = run(capsys, "snes", "checksum", p)
     assert code == 0 and out.startswith("hirom") and out.rstrip().endswith("ok")
     rom[0x1000] ^= 0xFF
     p.write_bytes(b"\0" * 512 + bytes(rom))
-    code, out = run(capsys, "checksum", p)
+    code, out = run(capsys, "snes", "checksum", p)
     assert code == 1 and "BAD" in out
-    code, out = run(capsys, "checksum", p, "--fix")
+    code, out = run(capsys, "snes", "checksum", p, "--fix")
     assert out.startswith("checksum ")
-    assert run(capsys, "checksum", p)[0] == 0
+    assert run(capsys, "snes", "checksum", p)[0] == 0
     assert p.read_bytes()[:512] == b"\0" * 512
 
 
 def test_dis(tmp_path, capsys, rom_factory):
     p = tmp_path / "r.sfc"
     p.write_bytes(rom_factory("lorom", code=bytes.fromhex("C230A93412"), code_at=0x808000))
-    code, out = run(capsys, "dis", p, "808000", "2")
+    code, out = run(capsys, "snes", "dis", p, "808000", "2")
     assert out.splitlines() == ["80:8000  c2 30        REP #$30", "80:8002  a9 34 12     LDA #$1234"]
-    code, out = run(capsys, "dis", p, "808002", "1", "--m16", "--mapper", "lorom")
+    code, out = run(capsys, "snes", "dis", p, "808002", "1", "--m16", "--mapper", "lorom")
     assert out.strip().endswith("LDA #$1234")
 
 
 def test_lz(tmp_path, capsys):
     data = tiles.encode([[1, 2, 3, 0, 1, 2, 3, 0]] * 8, 2) * 4
     (tmp_path / "in.bin").write_bytes(data)
-    run(capsys, "lz", "encode", tmp_path / "in.bin", tmp_path / "c.bin", "--planar")
+    run(capsys, "lzss", "encode", tmp_path / "in.bin", tmp_path / "c.bin", "--planar")
     c = (tmp_path / "c.bin").read_bytes()
-    assert lzss.decompress(c)[0] == lzss.snes_to_planar(data)
+    assert lzss.decompress(c)[0] == tiles.snes_to_planar(data)
     (tmp_path / "rom.bin").write_bytes(b"\xAA" * 16 + c)
-    code, out = run(capsys, "lz", "decode", tmp_path / "rom.bin", "10", tmp_path / "d.bin", "--planar")
+    code, out = run(capsys, "lzss", "decode", tmp_path / "rom.bin", "10", tmp_path / "d.bin", "--planar")
     assert (tmp_path / "d.bin").read_bytes() == data
 
 
 def test_tiles_bg_bgrefs(tmp_path, capsys):
     data = tiles.encode([[3] * 8] * 8, 2) * 10
     (tmp_path / "t.bin").write_bytes(data)
-    run(capsys, "tiles", tmp_path / "t.bin", "0", "A0", tmp_path / "t.png", "--cols", "5", "--scale", "1")
+    run(capsys, "snes", "tiles", tmp_path / "t.bin", "0", "A0", tmp_path / "t.png", "--cols", "5", "--scale", "1")
     assert Image.open(tmp_path / "t.png").size == (45, 18)
     (tmp_path / "vram.bin").write_bytes(bytes(0x10000))
     (tmp_path / "cg.bin").write_bytes(bytes(512))
-    run(capsys, "bg", tmp_path / "vram.bin", tmp_path / "cg.bin", "0", "0x1000", "4", tmp_path / "bg.png", "--scale", "1")
+    run(capsys, "snes", "bg", tmp_path / "vram.bin", tmp_path / "cg.bin", "0", "0x1000", "4", tmp_path / "bg.png", "--scale", "1")
     assert Image.open(tmp_path / "bg.png").size == (256, 256)
-    code, out = run(capsys, "bgrefs", tmp_path / "vram.bin", "--layer", "0:0x1000:4", "--range", "2000-2FFF")
+    code, out = run(capsys, "snes", "bgrefs", tmp_path / "vram.bin", "--layer", "0:0x1000:4", "--range", "2000-2FFF")
     assert out.strip() == "BG1 tiles->2000-2FFF: 1 2000-201F"
 
 
@@ -117,35 +116,35 @@ def test_glyph(tmp_path, capsys):
 
 def test_run_rejects_bad_script(tmp_path, capsys):
     (tmp_path / "s.txt").write_text("10 jump 4\n20 end\n")
-    code, out, err = run(capsys, "run", "nocore", "norom", tmp_path / "out", tmp_path / "s.txt", err=True)
+    code, out, err = run(capsys, "snes", "run", "nocore", "norom", tmp_path / "out", tmp_path / "s.txt", err=True)
     assert code == 2 and "unknown button" in err
 
 
 def test_run_load_failed(tmp_path, capsys):
     (tmp_path / "s.txt").write_text("10 end\n")
     (tmp_path / "r.sfc").write_bytes(bytes(0x8000))
-    code, out, err = run(capsys, "run", tmp_path / "missing_libretro.so", tmp_path / "r.sfc",
+    code, out, err = run(capsys, "snes", "run", tmp_path / "missing_libretro.so", tmp_path / "r.sfc",
                          tmp_path / "out", tmp_path / "s.txt", err=True)
     assert code == 3 and err.startswith("LOAD FAILED") and out == ""
 
 
 def test_errors_exit_2(tmp_path, capsys):
     code, out, err = run(capsys, "ips", "apply", tmp_path / "nope.sfc", tmp_path / "nope.ips", tmp_path / "o", err=True)
-    assert code == 2 and err.startswith("sfckr: error:")
+    assert code == 2 and err.startswith("krpatch: error:")
     (tmp_path / "bad.lz").write_bytes(b"\x05")
-    code, out, err = run(capsys, "lz", "decode", tmp_path / "bad.lz", "0", tmp_path / "o", err=True)
+    code, out, err = run(capsys, "lzss", "decode", tmp_path / "bad.lz", "0", tmp_path / "o", err=True)
     assert code == 2 and "truncated" in err
 
 
 def test_checksum_fix_refuses_unknown_header(tmp_path, capsys):
     p = tmp_path / "junk.bin"
     p.write_bytes(bytes(0x10000))
-    code, out, err = run(capsys, "checksum", p, "--fix", err=True)
+    code, out, err = run(capsys, "snes", "checksum", p, "--fix", err=True)
     assert code == 2 and "--mapper" in err
     assert p.read_bytes() == bytes(0x10000)
-    assert run(capsys, "checksum", p, "--fix", "--mapper", "lorom")[0] == 0
+    assert run(capsys, "snes", "checksum", p, "--fix", "--mapper", "lorom")[0] == 0
 
 
 def test_lua_dir(capsys):
-    code, out = run(capsys, "lua")
+    code, out = run(capsys, "snes", "lua")
     assert out.strip().endswith("lua")

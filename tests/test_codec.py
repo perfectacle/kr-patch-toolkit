@@ -2,7 +2,8 @@ import random
 
 import pytest
 
-from sfc_kr.codec import lzss
+from kr_patch import lzss
+from kr_patch.snes import tiles
 
 
 @pytest.mark.parametrize("data", [
@@ -54,9 +55,9 @@ def test_compress_rejects_oversize():
 
 def test_planar_conversion():
     tile = bytes(range(16))
-    snes = lzss.planar_to_snes(tile)
+    snes = tiles.planar_to_snes(tile)
     assert snes[:4] == bytes([0, 8, 1, 9])
-    assert lzss.snes_to_planar(snes) == tile
+    assert tiles.snes_to_planar(snes) == tile
 
 
 @pytest.mark.parametrize("stream,match", [

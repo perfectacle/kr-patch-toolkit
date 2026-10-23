@@ -86,3 +86,23 @@ def render(data, start, count, bpp, rows=8, stride=None, cols=16, scale=2, tall=
     if tall:
         tiles = [tiles[i] + tiles[i + 1] for i in range(0, len(tiles) - 1, 2)]
     return sheet(tiles, cols=cols, scale=scale, palette=palette)
+
+
+# Some games store 2bpp tiles as planar halves (plane 0 rows 0-7, then plane 1
+# rows 0-7), e.g. before compressing them.
+def planar_to_snes(data):
+    out = bytearray(len(data))
+    for t in range(0, len(data), 16):
+        for r in range(8):
+            out[t + r * 2] = data[t + r]
+            out[t + r * 2 + 1] = data[t + 8 + r]
+    return bytes(out)
+
+
+def snes_to_planar(data):
+    out = bytearray(len(data))
+    for t in range(0, len(data), 16):
+        for r in range(8):
+            out[t + r] = data[t + r * 2]
+            out[t + 8 + r] = data[t + r * 2 + 1]
+    return bytes(out)

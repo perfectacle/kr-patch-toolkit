@@ -9,9 +9,9 @@ from pathlib import Path
 
 import pytest
 
-from sfc_kr.harness import script
+from kr_patch.snes import script
 
-LUA_DIR = Path(__file__).resolve().parent.parent / "lua"
+LUA_DIR = Path(__file__).resolve().parent.parent / "src" / "kr_patch" / "snes" / "lua"
 
 STUB = r"""
 local cb

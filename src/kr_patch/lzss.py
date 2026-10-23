@@ -3,9 +3,6 @@
 Stream: u16 LE output size, then groups of 8 items led by a flag byte (LSB first).
 Flag 1: literal byte. Flag 0: u16 LE word, length = (word & 0xF) + 3,
 source position = out_pos - (word >> 4); positions before 0 read as zero.
-
-Some games store 2bpp tiles as planar halves (plane 0 rows 0-7, then plane 1
-rows 0-7) before compressing; planar_to_snes/snes_to_planar convert that.
 """
 
 MIN_LEN = 3
@@ -90,20 +87,3 @@ def compress(data):
         out[flag_at] = flags
     return bytes(out)
 
-
-def planar_to_snes(data):
-    out = bytearray(len(data))
-    for t in range(0, len(data), 16):
-        for r in range(8):
-            out[t + r * 2] = data[t + r]
-            out[t + r * 2 + 1] = data[t + 8 + r]
-    return bytes(out)
-
-
-def snes_to_planar(data):
-    out = bytearray(len(data))
-    for t in range(0, len(data), 16):
-        for r in range(8):
-            out[t + r] = data[t + r * 2]
-            out[t + 8 + r] = data[t + r * 2 + 1]
-    return bytes(out)
