@@ -2,6 +2,7 @@ import pytest
 
 from kr_patch.snes import bg, tiles
 
+
 # a diagonal with every colour index of the depth
 def _pattern(bpp, rows=8):
     top = (1 << bpp) - 1

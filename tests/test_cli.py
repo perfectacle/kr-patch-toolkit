@@ -1,4 +1,3 @@
-import pytest
 from PIL import Image
 
 from kr_patch import cli, lzss

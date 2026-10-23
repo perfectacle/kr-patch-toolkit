@@ -1,0 +1,42 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigestsToSemver"],
+  "timezone": "Asia/Seoul",
+  "labels": ["dependencies"],
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
+  "automerge": true,
+  "automergeType": "pr",
+  "platformAutomerge": true,
+  "automergeStrategy": "merge-commit",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "minimumReleaseAge": null,
+    "labels": ["dependencies", "security"]
+  },
+  "packageRules": [
+    {
+      "description": "A library: keep the published ranges in pyproject.toml and move only uv.lock",
+      "matchManagers": ["pep621"],
+      "rangeStrategy": "update-lockfile"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "zizmor runs via pipx in the workflow",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": ["ZIZMOR: zizmor==(?<currentValue>\\S+)"],
+      "depNameTemplate": "zizmor",
+      "datasourceTemplate": "pypi"
+    }
+  ]
+}
