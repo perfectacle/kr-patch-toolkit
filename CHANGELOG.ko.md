@@ -4,6 +4,9 @@
 
 ## 미출시
 
+- README: Mesen 2 와 MesenCE 에서 실행을 비교할 때 챙길 것(켤 때 RAM,
+  스크린샷 시점, 세이브 스테이트를 만드는 판, 프레임 어긋남)을 적었습니다.
+
 ## 0.5.0
 
 - FC(패미컴): `krpatch fc info|dis|listing|lua`. `kr_patch.fc.ines` 가 iNES·

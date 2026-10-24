@@ -4,6 +4,9 @@ English | [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
 
+- README: notes for comparing runs on Mesen 2 and MesenCE (power-on RAM,
+  screenshot timing, which version makes save states, frame drift).
+
 ## 0.5.0
 
 - FC (Famicom): `krpatch fc info|dis|listing|lua`. `kr_patch.fc.ines` reads
