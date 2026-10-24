@@ -72,8 +72,10 @@ krpatch ips apply original.sfc out.ips result.sfc
 `--headered` also writes a patch for SFC dumps with a 512-byte copier header.
 `--gap N` sets how many equal bytes end a record (default 6). Patches made
 with a different gap are equally valid but not byte-identical, so keep the
-value a project has already shipped with. Files must stay below 16 MB, the
-limit of IPS's 24-bit offsets.
+value a project has already shipped with. `--rle` writes runs of 16 or more
+equal bytes as RLE records, which keeps a patch that grows the ROM small (the
+new space is mostly filler); it is off by default because it changes the
+output. Files must stay below 16 MB, the limit of IPS's 24-bit offsets.
 
 ### `lzss`: LZSS codec
 

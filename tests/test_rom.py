@@ -128,6 +128,25 @@ def test_ips_growth_and_long_records():
     assert ips.apply(a, p) == b
 
 
+def test_ips_rle_growth():
+    a = bytes(range(256)) * 16
+    b = bytearray(a) + b"\xFF" * 0x30000 + bytes(range(200)) + b"\xFF" * 0x20000
+    b[0x100:0x140] = b"\x55" * 0x40          # a long run inside the old ROM
+    b[0x200:0x204] = b"\x66" * 4             # a short one stays plain data
+    b = bytes(b)
+    p = ips.make(a, b, rle=True)
+    assert ips.apply(a, p) == b
+    assert len(p) < 1000
+    assert len(ips.make(a, b)) > 0x50000     # without rle the filler is written out
+
+
+def test_ips_rle_off_by_default():
+    a = bytes(0x100)
+    b = a + b"\x11" * 0x200
+    assert ips.make(a, b) == ips.make(a, b, rle=False)
+    assert b"\x11" * 0x200 in ips.make(a, b)
+
+
 def test_ips_apply_rle_and_truncate():
     p = b"PATCH" + (4).to_bytes(3, "big") + b"\x00\x00" + (5).to_bytes(2, "big") + b"\x7F" + b"EOF" + (8).to_bytes(3, "big")
     assert ips.apply(bytes(16), p) == b"\x00" * 4 + b"\x7F" * 4
