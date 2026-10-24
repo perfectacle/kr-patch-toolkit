@@ -4,6 +4,8 @@ English | [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
 
+## 0.7.0
+
 - `ips make --rle` (and `ips.make(..., rle=True)`) writes runs of 16 or more
   equal bytes as RLE records, so a patch that grows the ROM no longer carries
   the filler of the new space. Off by default; output without it is unchanged.
