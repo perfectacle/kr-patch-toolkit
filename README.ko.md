@@ -23,7 +23,7 @@ NDS: 롬 이미지 읽기·풀기·다시 묶기. 기종마다 `krpatch <기종>
 Python 3.15 이상이 필요합니다.
 
 ```sh
-pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.3.0
+pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.4.0
 ```
 
 `krpatch` 명령과 `kr_patch` 패키지가 설치됩니다. 게임 프로젝트에서는
