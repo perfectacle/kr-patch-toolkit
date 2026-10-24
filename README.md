@@ -23,7 +23,7 @@ No ROM data is included. The tests build tiny synthetic ROM images.
 Python 3.15 or newer.
 
 ```sh
-pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.2.0
+pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.3.0
 ```
 
 This installs the `krpatch` command and the `kr_patch` package. Pin the tag in

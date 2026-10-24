@@ -4,6 +4,8 @@
 
 ## 미출시
 
+## 0.3.0
+
 - NDS: `krpatch nds info|ls|unpack|pack` 와 `kr_patch.nds.rom` 이 DS 롬의 헤더,
   이름 표, FAT, 오버레이 표를 읽고, 파일시스템을 폴더로 풀고, 파일을 바꾼 롬을
   다시 묶습니다(들어가면 제자리, 아니면 끝으로 옮김. FAT, 사용 크기, 장치 용량,

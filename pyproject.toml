@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kr-patch-toolkit"
-version = "0.2.0"
+version = "0.3.0"
 description = "Game-independent tools for translation patches: IPS and xdelta patches, LZSS and LZ10/LZ11 codecs, screenshot comparison, glyph tools, seamless music loops from recordings, SNES mappers, 65c816 disassembler, tile rendering and a libretro test harness, and NDS ROM unpacking and rebuilding."
 readme = "README.md"
 license = "MIT"

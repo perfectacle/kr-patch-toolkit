@@ -4,6 +4,8 @@ English | [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
 
+## 0.3.0
+
 - NDS: `krpatch nds info|ls|unpack|pack` and `kr_patch.nds.rom` read a DS ROM's
   header, name table, FAT and overlay tables, unpack the file system to a
   folder and rebuild a ROM with replaced files (in place when they fit, moved
