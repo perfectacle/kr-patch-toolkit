@@ -4,6 +4,8 @@
 
 ## 미출시
 
+## 0.4.0
+
 - **호환이 깨지는 변경:** 슈퍼 패미콤 도구의 이름을 모두 SFC 로 바꿨습니다.
   `krpatch snes …` 하위 명령은 `krpatch sfc …`(`dis`, `checksum`, `tiles`,
   `bg`, `bgrefs`, `run`, `lua`)입니다. 옛 이름은 별칭으로 남기지 않습니다.

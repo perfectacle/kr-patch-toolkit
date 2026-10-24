@@ -4,6 +4,8 @@ English | [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
 
+## 0.4.0
+
 - **Breaking:** the Super Famicom tools are now called SFC everywhere. The
   `krpatch snes …` subcommand is `krpatch sfc …` (`dis`, `checksum`, `tiles`,
   `bg`, `bgrefs`, `run`, `lua`); the old name is not kept as an alias. The
