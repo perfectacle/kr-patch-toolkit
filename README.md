@@ -391,6 +391,24 @@ and MesenCE 2.2.1 with power-on RAM set to zeros
 the same in both, apart from the run-to-run differences each version shows on
 its own. Only the save state files are not byte for byte the same.
 
+When comparing two runs (two emulators, or a ROM before and after a change),
+keep these in mind. They came up when four patches were checked again on both
+versions:
+
+- Power-on RAM is random by default, so even two runs of the same version can
+  part ways thousands of frames in. Add
+  `--snes.ramPowerOnState=AllZeros --snes.enableRandomPowerOnState=false` to
+  the command line; it applies to that run only and leaves the settings file
+  alone.
+- A screenshot taken in an `endFrame` callback is sometimes the previous
+  frame, even when both runs start from the same save state. Compare memory
+  dumps and logs (`wram.log`, dialogue IDs) rather than screenshots.
+- Make save states with Mesen 2. MesenCE loads them the same way Mesen 2 does,
+  but a state made by MesenCE loads differently in Mesen 2.
+- Over long runs from power-on the two versions drift apart by a few frames,
+  and the original ROM drifts the same way. Compare the order of events, not
+  the frame they happen on.
+
 ## FC commands
 
 FC (Famicom) PRG ROM is addressed by its offset and the CPU address the code
