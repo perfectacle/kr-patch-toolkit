@@ -4,6 +4,12 @@ English | [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
 
+- `xdelta apply` reads patches made by stock `xdelta3` with its default LZMA
+  secondary compression (`-S lzma`), which used to be an error; real-world
+  patches are usually made this way. The other secondary compressors (DJW,
+  FGK) are still an error, now naming the compressor. `vcdiff.header` also
+  returns `secondary` (the compressor name or `None`). `xdelta make` output
+  is unchanged.
 - README: notes for comparing runs on Mesen 2 and MesenCE (power-on RAM,
   screenshot timing, which version makes save states, frame drift).
 
