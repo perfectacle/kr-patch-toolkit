@@ -1,9 +1,11 @@
 """VCDIFF (RFC 3284) patches as written by xdelta3.
 
 `apply` is a pure-Python decoder for the default code table, with the xdelta3
-extensions it needs: an application header (skipped) and a per-window Adler-32
-of the target (checked). Secondary compression and custom code tables are not
-supported; `make` writes patches without them (`-S none`).
+extensions it needs: an application header (skipped), a per-window Adler-32
+of the target (checked) and LZMA secondary compression (xdelta3's default).
+The other xdelta3 secondary compressors (DJW, FGK) and custom code tables are
+not supported; `make` writes patches without secondary compression
+(`-S none`).
 """
 import shutil
 import subprocess
@@ -13,6 +15,8 @@ MAGIC = b"\xD6\xC3\xC4\x00"
 VCD_SOURCE, VCD_TARGET, VCD_ADLER32 = 1, 2, 4
 NOOP, ADD, RUN, COPY = 0, 1, 2, 3
 NEAR, SAME = 4, 3
+VCD_DATACOMP, VCD_INSTCOMP, VCD_ADDRCOMP = 1, 2, 4
+SECONDARY = {1: "djw", 2: "lzma", 16: "fgk"}
 
 
 def _code_table():
@@ -60,24 +64,58 @@ class _Reader:
 
 
 def header(patch):
-    """{'appheader': bytes or None} of a VCDIFF file. Raises ValueError on
-    features `apply` does not support."""
+    """{'appheader': bytes or None, 'secondary': compressor name or None} of a
+    VCDIFF file. Raises ValueError on features `apply` does not support."""
     r = _Reader(patch)
     if r.take(4) != MAGIC:
         raise ValueError("not a VCDIFF file")
     ind = r.byte()
+    if ind & ~7:
+        raise ValueError(f"VCDIFF: bad header indicator {ind:#04x}")
+    secondary = None
     if ind & 1:
-        raise ValueError("VCDIFF secondary compression is not supported (make the patch with -S none)")
+        sid = r.byte()
+        secondary = SECONDARY.get(sid, f"id {sid}")
+        if secondary != "lzma":
+            raise ValueError(f"VCDIFF secondary compressor {secondary} is not supported (only lzma; "
+                             "make the patch with -S lzma or -S none)")
     if ind & 2:
         raise ValueError("VCDIFF custom code tables are not supported")
     app = r.take(r.varint()) if ind & 4 else None
-    return {"appheader": app, "windows_at": r.p}
+    return {"appheader": app, "secondary": secondary, "windows_at": r.p}
+
+
+class _Lzma:
+    """xdelta3's LZMA secondary stream for one section kind. The encoder keeps
+    one .xz stream per kind (data, inst, addr) across all windows and
+    sync-flushes it at the end of each window, so a section is the next piece
+    of that stream: a varint of the decoded size, then the compressed bytes.
+    The stream never ends, which is why the decompressor lives across
+    windows."""
+
+    def __init__(self):
+        import lzma
+        self.z = lzma.LZMADecompressor(format=lzma.FORMAT_XZ)
+
+    def section(self, raw, win):
+        import lzma
+        r = _Reader(raw)
+        size = r.varint()
+        try:
+            out = self.z.decompress(raw[r.p:])
+        except lzma.LZMAError as e:
+            raise ValueError(f"VCDIFF window {win}: LZMA section does not decode ({e})") from None
+        if len(out) != size:
+            raise ValueError(f"VCDIFF window {win}: LZMA section decoded to {len(out)} bytes, header says {size}")
+        return out
 
 
 def apply(source, patch):
     """Target bytes from `source` and a VCDIFF `patch`. Raises ValueError on a
     malformed patch or an Adler-32 mismatch (wrong source file)."""
-    r = _Reader(patch, header(patch)["windows_at"])
+    h = header(patch)
+    r = _Reader(patch, h["windows_at"])
+    sec = [_Lzma() for _ in range(3)] if h["secondary"] else None
     out = bytearray()
     win = 0
     while r.p < len(patch):
@@ -94,16 +132,20 @@ def apply(source, patch):
         delta_len = r.varint()
         delta_at = r.p
         tlen = r.varint()
-        if r.byte():
-            raise ValueError("VCDIFF compressed sections are not supported")
+        comp = r.byte()
+        if comp & ~(VCD_DATACOMP | VCD_INSTCOMP | VCD_ADDRCOMP):
+            raise ValueError(f"VCDIFF window {win}: bad delta indicator {comp:#04x}")
+        if comp and not sec:
+            raise ValueError(f"VCDIFF window {win}: compressed sections but no secondary compressor in the header")
         dlen, ilen, alen = r.varint(), r.varint(), r.varint()
         adler = int.from_bytes(r.take(4), "big") if ind & VCD_ADLER32 else None
         if r.p - delta_at + dlen + ilen + alen != delta_len:
             raise ValueError(f"VCDIFF window {win}: delta encoding length does not match its sections")
-        data = _Reader(patch, r.p, r.p + dlen)
-        inst = _Reader(patch, r.p + dlen, r.p + dlen + ilen)
-        addr = _Reader(patch, r.p + dlen + ilen, r.p + dlen + ilen + alen)
-        r.p += dlen + ilen + alen
+        parts = []
+        for k, n in enumerate((dlen, ilen, alen)):
+            raw = r.take(n)
+            parts.append(_Reader(sec[k].section(raw, win) if comp >> k & 1 else raw))
+        data, inst, addr = parts
         t = _window(seg, tlen, data, inst, addr)
         if adler is not None and zlib.adler32(t) != adler:
             raise ValueError(f"VCDIFF window {win}: Adler-32 mismatch (is the source file the right one?)")

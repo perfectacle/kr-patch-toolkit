@@ -120,10 +120,11 @@ krpatch xdelta apply original.nds out.xdelta result.nds
 secondary compression and without the application header that stores file
 names, with a 256 MiB source window so a whole cartridge is searched, then
 checks the patch by decoding it. `apply` is a pure-Python decoder: it reads
-patches made by `xdelta3` with secondary compression off (`-S none`) and
-checks each window's Adler-32, which fails when the source file is not the
-one the patch was made from. Patches with secondary compression or a custom
-code table are an error.
+patches made by `xdelta3` with its default LZMA secondary compression or with
+secondary compression off (`-S none`), and checks each window's Adler-32,
+which fails when the source file is not the one the patch was made from.
+Patches with the other `xdelta3` secondary compressors (`-S djw`, `-S fgk`)
+or a custom code table are an error that names what is not supported.
 
 ### `linear`: linear bitmaps
 
