@@ -571,6 +571,88 @@ def _sfc_parser(sub):
     p.set_defaults(fn=cmd_lua)
 
 
+# FC commands
+
+def _fc_prg(path):
+    from .fc import ines
+    data = _read(path)
+    return ines.parse(data), ines.prg(data)
+
+
+def cmd_fc_info(a):
+    h, _ = _fc_prg(a.rom)
+    chr_ = f"{h.chr_size // 1024}K" if h.chr_size else "0 (CHR-RAM)"
+    sub = f".{h.submapper}" if h.nes2 else ""
+    print(f"{'NES 2.0' if h.nes2 else 'iNES'} mapper={h.mapper}{sub} prg={h.prg_size // 1024}K chr={chr_} "
+          f"mirroring={h.mirroring} battery={'yes' if h.battery else 'no'} trainer={'yes' if h.trainer else 'no'}")
+
+
+def _bank_size(s):
+    kb = int(s)
+    if kb not in (8, 16, 32):
+        raise argparse.ArgumentTypeError("bank size is 8, 16 or 32 (KB)")
+    return kb * 1024
+
+
+def cmd_fc_dis(a):
+    from .fc.dis6502 import disasm
+    _, prg = _fc_prg(a.rom)
+    if a.offset is not None:
+        off = a.offset
+    else:
+        bank = a.bank if a.bank is not None else len(prg) // a.bank_size - 1
+        off = bank * a.bank_size + a.addr % a.bank_size
+    if not 0 <= off < len(prg):
+        raise ValueError(f"PRG offset {off:X} outside the {len(prg):X}-byte PRG ROM")
+    print(disasm(prg, off, a.addr, a.count, a.bank_size))
+
+
+def cmd_fc_listing(a):
+    from .fc.dis6502 import listing, read_cover
+    _, prg = _fc_prg(a.rom)
+    lo, hi = (int(x, 16) for x in a.range.split("-"))
+    rows = [r for r in read_cover(Path(a.cover).read_text().splitlines()) if lo <= r[0] <= hi]
+    print(listing(prg, rows, a.bank_size))
+
+
+def fc_lua_dir():
+    return Path(__file__).resolve().parent / "fc" / "lua"
+
+
+def cmd_fc_lua(a):
+    print(fc_lua_dir())
+
+
+def _fc_parser(sub):
+    fc = sub.add_parser("fc", help="FC (Famicom) tools").add_subparsers(
+        dest="fc_cmd", required=True, metavar="command")
+
+    p = fc.add_parser("info", help="iNES / NES 2.0 header: mapper, PRG and CHR sizes, mirroring, battery")
+    p.add_argument("rom")
+    p.set_defaults(fn=cmd_fc_info)
+
+    p = fc.add_parser("dis", help="disassemble 6502 code")
+    p.add_argument("rom")
+    p.add_argument("addr", type=_hex, help="CPU address in hex, e.g. C000")
+    p.add_argument("count", type=int, nargs="?", default=40)
+    p.add_argument("--bank", type=_hex, help="PRG bank mapped at ADDR (hex; default: the last bank)")
+    p.add_argument("--bank-size", type=_bank_size, default=0x4000, metavar="KB",
+                   help="PRG bank size in KB: 8, 16 (default) or 32")
+    p.add_argument("--offset", type=_hex, help="PRG ROM offset (hex) instead of --bank")
+    p.set_defaults(fn=cmd_fc_dis)
+
+    p = fc.add_parser("listing", help="disassemble the instructions a cover.lua run executed")
+    p.add_argument("rom")
+    p.add_argument("cover", help="cover.txt from probe/cover.lua")
+    p.add_argument("--range", default="0-FFFFFF", help="PRG offset range in hex, e.g. 3C000-3FFFF")
+    p.add_argument("--bank-size", type=_bank_size, default=0x4000, metavar="KB",
+                   help="PRG bank size in KB for the BB:AAAA labels (default 16)")
+    p.set_defaults(fn=cmd_fc_listing)
+
+    p = fc.add_parser("lua", help="print the directory of the bundled MesenCE Lua scripts for FC")
+    p.set_defaults(fn=cmd_fc_lua)
+
+
 # NDS commands
 
 def _nds(path):
@@ -747,6 +829,7 @@ def build_parser():
 
     _audio_parser(sub)
     _sfc_parser(sub)
+    _fc_parser(sub)
     _nds_parser(sub)
     return ap
 
