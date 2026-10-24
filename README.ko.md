@@ -3,12 +3,13 @@
 [English](README.md) | 한국어
 
 번역 패치를 만들고 검증할 때 쓰는, 게임과 무관한 도구 모음입니다. 일부는
-기종과도 무관하고(IPS 패치, LZSS 코덱, 파일 비교, 스크린샷 비교, macOS OCR 을
-곁들인 비트맵 글리프 도구, 녹음에서 끊김 없이 반복되는 배경음악 잘라 내기),
-나머지는 슈퍼패미컴(SNES)용입니다: 카트리지 매퍼,
-헤더 체크섬, 65c816 디스어셈블러, 타일·BG 렌더링, 헤드리스 libretro 테스트
-실행기, Mesen 2·MesenCE 용 Lua 스크립트. 다른 기종(NDS 부터)도 지원할 예정이며, 기종마다
-`krpatch <기종>` 명령을 따로 둡니다.
+기종과도 무관하고(IPS·xdelta(VCDIFF) 패치, LZSS·LZ10/LZ11 코덱, 파일 비교,
+스크린샷 비교, macOS OCR 을 곁들인 비트맵 글리프 도구, 선형 비트맵 렌더링,
+녹음에서 끊김 없이 반복되는 배경음악 잘라 내기), 나머지는 기종별입니다.
+슈퍼패미컴(SNES): 카트리지 매퍼, 헤더 체크섬, 65c816 디스어셈블러, 타일·BG
+렌더링, 헤드리스 libretro 테스트 실행기, Mesen 2·MesenCE 용 Lua 스크립트.
+NDS: 롬 이미지 읽기·풀기·다시 묶기. 기종마다 `krpatch <기종>` 명령을 따로
+둡니다.
 
 여러 한글 패치가 함께 쓰는 부분을 모은 것입니다. 한 게임에만 해당하는 것
 (대본 형식, 포인터 테이블, RAM 주소)은 그 게임의 저장소에 두고 인자로
@@ -38,6 +39,9 @@ pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.2.0
 | --- | --- |
 | `krpatch ips make\|apply` | IPS 패치 생성·적용 |
 | `krpatch lzss decode\|encode` | LZSS 코덱 |
+| `krpatch lz11 decode\|encode` | 닌텐도 LZ10/LZ11 코덱 |
+| `krpatch xdelta make\|apply` | xdelta(VCDIFF) 패치 생성·적용 |
+| `krpatch linear` | DS 폰트 같은 선형 비트맵 렌더링 |
 | `krpatch diff` | 두 파일이 다른 바이트 범위 |
 | `krpatch shotcmp` | 스크린샷을 비교해 텍스트로 출력 |
 | `krpatch contact` | 스크린샷 모아 보기(contact sheet) |
@@ -50,6 +54,8 @@ pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.2.0
 | `krpatch snes bg`, `bgrefs` | VRAM/CGRAM 덤프에서 BG 레이어 |
 | `krpatch snes run` | 헤드리스 libretro 실행기 |
 | `krpatch snes lua` | 함께 들어 있는 Mesen 2·MesenCE 용 Lua 스크립트 경로 |
+| `krpatch nds info\|ls` | NDS 헤더, 표, 파일 목록 |
+| `krpatch nds unpack\|pack` | NDS 파일시스템을 폴더로 풀고 다시 롬으로 묶기 |
 
 ### `ips`: IPS 패치 생성·적용
 
@@ -78,6 +84,48 @@ krpatch lzss encode font.bin font.lz [--planar]
 
 `--planar` 는 두 planar 절반으로 저장된 SNES 2bpp 타일을 SNES 순서로 바꾸거나
 그 반대로 바꿉니다. 스트림이 잘렸거나 거리가 0인 복사가 있으면 오류입니다.
+
+### `lz11`: 닌텐도 LZ10/LZ11 코덱
+
+GBA/DS BIOS 의 압축입니다. 형식 바이트(`0x10` 또는 `0x11`)와 u24 출력 크기
+뒤에 플래그 바이트(MSB 먼저)가 이끄는 8개 묶음이 이어지고, 참조는 4096바이트
+뒤까지 닿습니다. LZ11 은 더 긴 참조(최대 65808바이트)를 씁니다.
+
+```sh
+krpatch lz11 decode file.lz out.bin [--offset 1A0]
+krpatch lz11 encode out.bin file.lz [--lz10] [--vram]
+```
+
+인코더는 탐욕적(가장 긴 일치, 길이가 같으면 가장 가까운 것)이라 같은 입력에
+늘 같은 바이트를 냅니다. `--vram` 은 VRAM 으로 바로 푸는 BIOS 루틴이 잘못
+푸는 거리 1 참조를 쓰지 않습니다. 다른 압축기의 출력을 재현하도록 맞추지는 않았습니다.
+스트림이 중간에 끝나거나 시작 전을 참조하면 오류입니다.
+
+### `xdelta`: xdelta(VCDIFF) 패치
+
+DS 게임처럼 IPS 로 다룰 수 없는(16 MiB 넘는) 롬을 위한 것입니다.
+
+```sh
+krpatch xdelta make original.nds patched.nds out.xdelta [--level 9]
+krpatch xdelta apply original.nds out.xdelta result.nds
+```
+
+`make` 는 `xdelta3` 명령(`--xdelta3` 로 다른 것 지정)을 2차 압축 없이, 파일
+이름을 담는 애플리케이션 헤더 없이, 카트리지 전체를 찾도록 256 MiB 원본 창으로
+돌린 뒤 패치를 다시 풀어 확인합니다. `apply` 는 순수 Python 디코더로, 2차
+압축을 끄고(`-S none`) 만든 `xdelta3` 패치를 읽고 창마다 Adler-32 를 확인합니다.
+패치를 만든 원본과 다른 파일이면 여기서 실패합니다. 2차 압축이나 사용자
+코드 표를 쓴 패치는 오류입니다.
+
+### `linear`: 선형 비트맵
+
+8x8 타일이 아니라 한 줄씩 `--bpp` 비트로 저장한 비트맵입니다. DS 게임의 폰트가
+흔히 이렇습니다. `--order lsb` 는 바이트의 낮은 비트에 첫 픽셀을(DS 4bpp),
+`msb` 는 높은 비트에 둡니다.
+
+```sh
+krpatch linear font.bin font.png --size 16x24 --bpp 2 --order msb --start 0 --count 256
+```
 
 ### `diff`: 두 파일이 다른 바이트 범위
 
@@ -338,6 +386,41 @@ Mesen 2 는 2.1.1 이 마지막 버전이고, 저장소(SourMesen/Mesen2)는 202
 안에서도 실행마다 달라지는 부분뿐이었습니다. 세이브 스테이트 파일만 바이트가
 다릅니다.
 
+## NDS 명령
+
+### `nds info`, `nds ls`: 헤더와 파일
+
+```sh
+krpatch nds info game.nds
+krpatch nds ls game.nds
+```
+
+`ls` 는 파일마다 번호, 오프셋, 크기, 경로를 출력합니다. 오버레이는
+`overlay9/overlay_0000.bin` 처럼 나옵니다.
+
+### `nds unpack`, `nds pack`: 파일시스템을 폴더로, 다시 롬으로
+
+```sh
+krpatch nds unpack game.nds work/
+# work/data/ 나 work/overlay9/ 아래 파일을 고친다
+krpatch nds pack game.nds work/ patched.nds
+```
+
+`unpack` 은 `header.bin`, `arm9.bin`, `arm7.bin`, `y9.bin`/`y7.bin`(오버레이 표),
+`banner.bin`, `overlay9/`, `overlay7/` 와 `data/` 아래 파일시스템을 씁니다.
+`pack` 은 `data/`, `overlay9/`, `overlay7/` 아래에서 롬과 다른 파일만 바꾸고,
+나머지 부분은 읽지 않습니다. 바뀐 파일이 원래 자리에 들어가면 그 자리에 두고
+(남는 곳은 자리 바로 뒤 바이트에 따라 0xFF 또는 0x00 으로 채움), 안 들어가거나
+다른 FAT 항목과 바이트를 나눠 쓰면 롬 끝으로 0x200 정렬해 옮깁니다. 마지막
+파일 뒤의 채움이 아닌 데이터(다운로드 플레이 서명 등)는 그 자리에 둡니다. FAT,
+사용 크기, 장치 용량, 헤더 CRC 를 고칩니다. 오버레이 표는 고치지 않으므로
+오버레이는 크기가 같은 데이터로만 바꿀 수 있습니다. DSi 확장 롬은 거부합니다.
+`unpack` 은 폴더 밖으로 나가는 이름이나 대소문자만 다른 이름이 있는 롬을
+거부합니다. 같은 롬과 폴더는 늘 같은 바이트를
+내고, 바뀌지 않은 파일은 오프셋이 그대로라 패치가 작습니다. 파일 번호는 롬의
+이름 표를 따릅니다. 같은 게임도 빌드에 따라 같은 파일의 번호가 다를 수 있으니
+파일은 경로로 비교합니다.
+
 ## Python API
 
 ```python
@@ -355,11 +438,19 @@ from kr_patch.audio import loudness, wav
 
 x, rate = wav.read("song.wav")          # int16, (프레임, 채널) 모양
 print(loudness.integrated(x / 32768, rate))
+
+from kr_patch import lz11, vcdiff
+from kr_patch.nds.rom import Rom, rebuild
+
+nds = Rom(open("game.nds", "rb").read())
+fid = nds.find("script/scene01.bin")           # data/ 아래 경로
+text, _ = lz11.decompress(nds.file(fid))
+out = rebuild(nds, {fid: lz11.compress(text)})
 ```
 
 ## 계획
 
-- `kr_patch.nds` 와 `krpatch nds ...` 로 NDS 지원.
+- `krpatch nds run`: `snes run` 처럼 DS 코어용 헤드리스 libretro 실행기.
 - `game.toml`: 게임 프로젝트가 매퍼, 감시할 RAM, 에뮬레이터 조합, 시나리오를
   파일 하나에 적어 두어 명령에 넘길 인자를 줄입니다.
 

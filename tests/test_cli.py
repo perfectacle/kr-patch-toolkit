@@ -147,3 +147,37 @@ def test_checksum_fix_refuses_unknown_header(tmp_path, capsys):
 def test_lua_dir(capsys):
     code, out = run(capsys, "snes", "lua")
     assert out.strip().endswith("lua")
+
+
+def test_nds_unpack_pack(tmp_path, capsys):
+    from test_nds import make_nds
+    (tmp_path / "r.nds").write_bytes(make_nds())
+    code, out = run(capsys, "nds", "info", tmp_path / "r.nds")
+    assert code == 0 and "KRPT" in out and "files 4" in out
+    code, out = run(capsys, "nds", "ls", tmp_path / "r.nds")
+    assert "sub/b.bin" in out and "overlay9/overlay_0000.bin" in out
+    run(capsys, "nds", "unpack", tmp_path / "r.nds", tmp_path / "x")
+    (tmp_path / "x/data/sub/b.bin").write_bytes(b"new")
+    code, out = run(capsys, "nds", "pack", tmp_path / "r.nds", tmp_path / "x", tmp_path / "o.nds")
+    assert code == 0 and "sub/b.bin" in out and "1 files replaced" in out
+    from kr_patch.nds.rom import Rom
+    r = Rom((tmp_path / "o.nds").read_bytes())
+    assert r.file(r.find("sub/b.bin")) == b"new"
+
+
+def test_lz11_cli(tmp_path, capsys):
+    (tmp_path / "a").write_bytes(b"abcabcabc" * 50)
+    code, out = run(capsys, "lz11", "encode", tmp_path / "a", tmp_path / "a.lz")
+    assert code == 0
+    code, out = run(capsys, "lz11", "decode", tmp_path / "a.lz", tmp_path / "b")
+    assert (tmp_path / "b").read_bytes() == b"abcabcabc" * 50
+    code, out, err = run(capsys, "lz11", "decode", tmp_path / "a", tmp_path / "c", err=True)
+    assert code == 2 and "LZ10/LZ11" in err
+
+
+def test_linear_cli(tmp_path, capsys):
+    (tmp_path / "f").write_bytes(bytes(range(64)))
+    code, out = run(capsys, "linear", tmp_path / "f", tmp_path / "f.png", "--size", "8x8", "--bpp", "2",
+                    "--order", "msb", "--cols", "4", "--scale", "1")
+    assert code == 0
+    assert Image.open(tmp_path / "f.png").size == (4 * 9 + 1, 9 + 1)

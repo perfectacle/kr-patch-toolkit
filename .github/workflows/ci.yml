@@ -28,8 +28,9 @@ jobs:
           version: 0.13.1
           enable-cache: true
 
-      - name: Install Lua 5.4
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends lua5.4
+      # xdelta3: the xdelta make test is skipped without it
+      - name: Install Lua 5.4 and xdelta3
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends lua5.4 xdelta3
 
       - name: Check Lua syntax
         run: find src/kr_patch/snes/lua -name '*.lua' -print0 | xargs -0 -n1 luac5.4 -p

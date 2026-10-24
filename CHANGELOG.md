@@ -4,6 +4,19 @@ English | [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
 
+- NDS: `krpatch nds info|ls|unpack|pack` and `kr_patch.nds.rom` read a DS ROM's
+  header, name table, FAT and overlay tables, unpack the file system to a
+  folder and rebuild a ROM with replaced files (in place when they fit, moved
+  to the end otherwise; FAT, used size, device capacity and header CRC
+  updated).
+- `krpatch lz11 decode|encode` (`kr_patch.lz11`): Nintendo LZ10/LZ11 codec;
+  `--vram` avoids distance-1 references for BIOS decompression to VRAM.
+- `krpatch xdelta make|apply` (`kr_patch.vcdiff`): VCDIFF patches. `make` runs
+  `xdelta3` without secondary compression or file names in the header;
+  `apply` is a pure-Python decoder that checks each window's Adler-32.
+- `krpatch linear` (`kr_patch.linear`): render linear 1/2/4/8bpp bitmaps with
+  either pixel order in a byte.
+- CI installs `xdelta3` so the `xdelta make` test runs.
 - `examples/snes/run_all.sh`: `MESENCE` (save folder `MESENCE_SAVES`) also runs
   every scenario on MesenCE, the successor of the archived Mesen 2. `MESEN`
   runs Mesen 2 as before.

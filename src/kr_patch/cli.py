@@ -143,6 +143,41 @@ def cmd_ocr(a):
         print(f"{k}\t{ch or '?'}")
 
 
+def cmd_lz11_decode(a):
+    from . import lz11
+    data, n = lz11.decompress(_read(a.file), a.offset)
+    Path(a.out).write_bytes(data)
+    print(f"{len(data)} bytes from {n} compressed")
+
+
+def cmd_lz11_encode(a):
+    from . import lz11
+    data = _read(a.file)
+    out = lz11.compress(data, 0x10 if a.lz10 else 0x11, 2 if a.vram else 1)
+    Path(a.out).write_bytes(out)
+    print(f"{len(out)} bytes from {len(data)}")
+
+
+def cmd_xdelta_make(a):
+    from . import vcdiff
+    n = vcdiff.make(a.base, a.patched, a.out, a.xdelta3, a.level)
+    print(f"{a.out}: {n} bytes")
+
+
+def cmd_xdelta_apply(a):
+    from . import vcdiff
+    Path(a.out).write_bytes(vcdiff.apply(_read(a.file), _read(a.patch)))
+
+
+def cmd_linear(a):
+    from . import linear
+    w, h = (int(x) for x in a.size.lower().split("x"))
+    data = _read(a.file)[a.offset:]
+    img = linear.sheet(data, w, h, a.bpp, a.order, a.start, a.count, a.cols, a.scale)
+    img.save(a.out)
+    print(f"{a.out}: {img.width}x{img.height}")
+
+
 # audio commands (numpy is imported only here, so other commands start fast)
 
 def _span(s):
@@ -536,6 +571,68 @@ def _snes_parser(sub):
     p.set_defaults(fn=cmd_lua)
 
 
+# NDS commands
+
+def _nds(path):
+    from .nds.rom import Rom
+    return Rom(_read(path))
+
+
+def cmd_nds_info(a):
+    r = _nds(a.rom)
+    print(f"title {r.title}  code {r.code}  size {len(r.data):#x}  used {r.used:#x}")
+    for name, (off, size) in (("arm9", r.arm9), ("arm7", r.arm7), ("fnt", r.fnt), ("fat", r.fat),
+                              ("ovt9", r.ovt9), ("ovt7", r.ovt7)):
+        print(f"{name:5} {off:#010x} {size:#x}")
+    print(f"files {len(r.entries)}  named {len(r.names)}  overlays {len(r.overlays['9'])}+{len(r.overlays['7'])}")
+
+
+def cmd_nds_ls(a):
+    r = _nds(a.rom)
+    rows = [(fid, n) for fid, n in r.names.items()] + [(fid, p) for p, fid in r.overlay_files().items()]
+    for fid, name in sorted(rows):
+        s, e = r.entries[fid]
+        print(f"{fid:5d} {s:#010x} {e - s:10d}  {name}")
+
+
+def cmd_nds_unpack(a):
+    from .nds.rom import unpack
+    print(f"{unpack(_nds(a.rom), a.out)} files -> {a.out}")
+
+
+def cmd_nds_pack(a):
+    from .nds.rom import pack
+    out, changed = pack(_nds(a.rom), a.dir)
+    Path(a.out).write_bytes(out)
+    for p in changed:
+        print(p)
+    print(f"{len(changed)} files replaced -> {a.out} ({len(out)} bytes)")
+
+
+def _nds_parser(sub):
+    nds = sub.add_parser("nds", help="Nintendo DS tools").add_subparsers(
+        dest="nds_cmd", required=True, metavar="command")
+
+    p = nds.add_parser("info", help="header, table offsets and file counts")
+    p.add_argument("rom")
+    p.set_defaults(fn=cmd_nds_info)
+
+    p = nds.add_parser("ls", help="list files: id, offset, size, path")
+    p.add_argument("rom")
+    p.set_defaults(fn=cmd_nds_ls)
+
+    p = nds.add_parser("unpack", help="write header, ARM binaries, overlays and data/ to a folder")
+    p.add_argument("rom")
+    p.add_argument("out")
+    p.set_defaults(fn=cmd_nds_unpack)
+
+    p = nds.add_parser("pack", help="rebuild ROM with the files under DIR (data/, overlay9/, overlay7/) that differ")
+    p.add_argument("rom")
+    p.add_argument("dir")
+    p.add_argument("out")
+    p.set_defaults(fn=cmd_nds_pack)
+
+
 def build_parser():
     ap = argparse.ArgumentParser(prog="krpatch", description="Translation patch tools")
     ap.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -606,8 +703,51 @@ def build_parser():
     p.add_argument("--fix-mo", action="store_true", help="re-decide ㅁ/ㅇ from glyph corners (pixel fonts only)")
     p.set_defaults(fn=cmd_ocr)
 
+    p = sub.add_parser("lz11", help="Nintendo LZ10/LZ11 (GBA/DS BIOS) codec")
+    lz = p.add_subparsers(dest="op", required=True)
+    q = lz.add_parser("decode")
+    q.add_argument("file")
+    q.add_argument("out")
+    q.add_argument("--offset", type=_hex, default=0, help="stream start in FILE (hex)")
+    q.set_defaults(fn=cmd_lz11_decode)
+    q = lz.add_parser("encode")
+    q.add_argument("file")
+    q.add_argument("out")
+    q.add_argument("--lz10", action="store_true", help="write LZ10 (type 0x10) instead of LZ11")
+    q.add_argument("--vram", action="store_true", help="no distance-1 references (safe for BIOS decompression to VRAM)")
+    q.set_defaults(fn=cmd_lz11_encode)
+
+    p = sub.add_parser("xdelta", help="create or apply VCDIFF (xdelta3) patches")
+    xd = p.add_subparsers(dest="op", required=True)
+    q = xd.add_parser("make", help="patch from BASE to PATCHED with xdelta3, checked by decoding it")
+    q.add_argument("base")
+    q.add_argument("patched")
+    q.add_argument("out")
+    q.add_argument("--xdelta3", default="xdelta3", help="xdelta3 command (default: from PATH)")
+    q.add_argument("--level", type=int, default=9, choices=range(10), metavar="0-9")
+    q.set_defaults(fn=cmd_xdelta_make)
+    q = xd.add_parser("apply", help="apply a patch without secondary compression")
+    q.add_argument("file")
+    q.add_argument("patch")
+    q.add_argument("out")
+    q.set_defaults(fn=cmd_xdelta_apply)
+
+    p = sub.add_parser("linear", help="render linear (row-packed) bitmaps such as DS fonts to PNG")
+    p.add_argument("file")
+    p.add_argument("out")
+    p.add_argument("--size", required=True, metavar="WxH")
+    p.add_argument("--bpp", type=int, required=True, choices=(1, 2, 4, 8))
+    p.add_argument("--order", choices=("lsb", "msb"), default="lsb", help="first pixel in the low (lsb) or high bits")
+    p.add_argument("--offset", type=_hex, default=0, help="data start in FILE (hex)")
+    p.add_argument("--start", type=int, default=0, help="first bitmap index")
+    p.add_argument("--count", type=int)
+    p.add_argument("--cols", type=int, default=16)
+    p.add_argument("--scale", type=int, default=2)
+    p.set_defaults(fn=cmd_linear)
+
     _audio_parser(sub)
     _snes_parser(sub)
+    _nds_parser(sub)
     return ap
 
 
