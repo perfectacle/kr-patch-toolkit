@@ -1,4 +1,4 @@
-"""CPU address <-> ROM file offset for the common SNES cartridge maps.
+"""CPU address <-> ROM file offset for the common SFC cartridge maps.
 
 Offsets are into a headerless image. `to_offset` is deliberately permissive: it
 masks the address the way the board decodes it and does not reject addresses

@@ -1,4 +1,4 @@
-"""SNES planar tiles: decode to pixel indices and lay them out as an image.
+"""SFC planar tiles: decode to pixel indices and lay them out as an image.
 
 1bpp tiles are one byte per row. 2/4/8bpp tiles store bitplanes in pairs: each
 pair is `rows` words (low plane, high plane per row), pairs follow each other.
@@ -90,7 +90,7 @@ def render(data, start, count, bpp, rows=8, stride=None, cols=16, scale=2, tall=
 
 # Some games store 2bpp tiles as planar halves (plane 0 rows 0-7, then plane 1
 # rows 0-7), e.g. before compressing them.
-def planar_to_snes(data):
+def planar_to_sfc(data):
     out = bytearray(len(data))
     for t in range(0, len(data), 16):
         for r in range(8):
@@ -99,7 +99,7 @@ def planar_to_snes(data):
     return bytes(out)
 
 
-def snes_to_planar(data):
+def sfc_to_planar(data):
     out = bytearray(len(data))
     for t in range(0, len(data), 16):
         for r in range(8):

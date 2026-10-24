@@ -6,7 +6,7 @@ Game-independent tools for building and testing translation patches. Some are
 platform-independent (IPS and xdelta/VCDIFF patches, LZSS and LZ10/LZ11
 codecs, file diffs, screenshot comparison, bitmap glyph tools with macOS OCR,
 linear bitmap rendering, seamless music loops cut from recordings); the rest
-are for a platform. SNES (Super Famicom): cartridge mappers, header checksums,
+are for a platform. SFC (Super Famicom): cartridge mappers, header checksums,
 a 65c816 disassembler, tile and BG rendering, a headless libretro test runner
 and Lua scripts for Mesen 2 and MesenCE. NDS: reading, unpacking and
 rebuilding ROM images. Each platform has its own `krpatch <platform>`
@@ -32,7 +32,7 @@ not change when the toolkit does.
 
 ## Commands
 
-Run `krpatch <command> -h` (or `krpatch snes <command> -h`) for every option.
+Run `krpatch <command> -h` (or `krpatch sfc <command> -h`) for every option.
 Addresses and offsets are hex unless stated otherwise.
 
 | Command | Does |
@@ -48,12 +48,12 @@ Addresses and offsets are hex unless stated otherwise.
 | `krpatch glyph show\|make\|set` | bitmap glyphs in a JSON store |
 | `krpatch ocr` | read glyphs with macOS Vision |
 | `krpatch audio segments\|period\|loop\|seamcheck\|loudness` | song boundaries, loop period, loop files, loudness |
-| `krpatch snes dis` | disassemble 65c816 code |
-| `krpatch snes checksum` | check or fix the internal header checksum |
-| `krpatch snes tiles` | render planar tiles |
-| `krpatch snes bg`, `bgrefs` | BG layers from VRAM/CGRAM dumps |
-| `krpatch snes run` | headless libretro runner |
-| `krpatch snes lua` | path of the bundled Lua scripts for Mesen 2 and MesenCE |
+| `krpatch sfc dis` | disassemble 65c816 code |
+| `krpatch sfc checksum` | check or fix the internal header checksum |
+| `krpatch sfc tiles` | render planar tiles |
+| `krpatch sfc bg`, `bgrefs` | BG layers from VRAM/CGRAM dumps |
+| `krpatch sfc run` | headless libretro runner |
+| `krpatch sfc lua` | path of the bundled Lua scripts for Mesen 2 and MesenCE |
 | `krpatch nds info\|ls` | NDS header, tables and file list |
 | `krpatch nds unpack\|pack` | NDS file system to a folder and back into a ROM |
 
@@ -65,7 +65,7 @@ krpatch ips apply original.sfc out.ips result.sfc
 ```
 
 `make` checks that each patch reproduces the patched file before writing it.
-`--headered` also writes a patch for SNES dumps with a 512-byte copier header.
+`--headered` also writes a patch for SFC dumps with a 512-byte copier header.
 `--gap N` sets how many equal bytes end a record (default 6). Patches made
 with a different gap are equally valid but not byte-identical, so keep the
 value a project has already shipped with. Files must stay below 16 MB, the
@@ -82,8 +82,8 @@ krpatch lzss decode game.sfc 0A8000 font.bin [--planar]
 krpatch lzss encode font.bin font.lz [--planar]
 ```
 
-`--planar` converts SNES 2bpp tiles stored as two planar halves to and from
-SNES order. A truncated stream or a copy with distance 0 is an error.
+`--planar` converts SFC 2bpp tiles stored as two planar halves to and from
+SFC order. A truncated stream or a copy with distance 0 is an error.
 
 ### `lz11`: Nintendo LZ10/LZ11 codec
 
@@ -173,7 +173,7 @@ turn correct results wrong on smooth fonts.
 
 ### `audio`: seamless loops from recordings
 
-For game music recorded from an emulator, e.g. with `krpatch snes run --wav`.
+For game music recorded from an emulator, e.g. with `krpatch sfc run --wav`.
 Input is 16-bit PCM WAV; times are in seconds unless stated otherwise.
 Channels are never mixed to mono, so a voice panned in anti-phase still
 counts.
@@ -262,55 +262,55 @@ it. Silence prints `null` for both and no gain. True peak is not measured: use
 
 Unreadable or truncated WAV files are an error (exit 2).
 
-## SNES commands
+## SFC commands
 
-### `snes dis`: disassemble 65c816 code
+### `sfc dis`: disassemble 65c816 code
 
 ```sh
-krpatch snes dis game.sfc 808000 40              # 40 instructions from $80:8000
-krpatch snes dis game.sfc C08000 --mapper sa1    # lorom | hirom | exhirom | sa1 | auto (default)
-krpatch snes dis game.sfc 808000 --m16 --x16     # start with 16-bit A and X/Y
+krpatch sfc dis game.sfc 808000 40              # 40 instructions from $80:8000
+krpatch sfc dis game.sfc C08000 --mapper sa1    # lorom | hirom | exhirom | sa1 | auto (default)
+krpatch sfc dis game.sfc 808000 --m16 --x16     # start with 16-bit A and X/Y
 ```
 
 `REP`/`SEP` update the register widths as decoding goes on. Block moves are
 printed in assembler order, `MVN src,dst`. `auto` reads the internal header to
 pick the mapper; a 512-byte copier header is skipped. SA-1 uses the power-on
-Super MMC blocks (0-3); `kr_patch.snes.mapper.SA1(blocks=...)` takes others.
+Super MMC blocks (0-3); `kr_patch.sfc.mapper.SA1(blocks=...)` takes others.
 
-### `snes checksum`: check or fix the header checksum
+### `sfc checksum`: check or fix the header checksum
 
 ```sh
-krpatch snes checksum game.sfc          # prints mapper, title, stored and computed values; exit 1 if wrong
-krpatch snes checksum game.sfc --fix    # rewrite complement and checksum in place
+krpatch sfc checksum game.sfc          # prints mapper, title, stored and computed values; exit 1 if wrong
+krpatch sfc checksum game.sfc --fix    # rewrite complement and checksum in place
 ```
 
 `--fix` refuses when no internal header is recognisable, unless `--mapper` is
 given. Non-power-of-two sizes are summed the way the cartridge mirrors them.
 
-### `snes tiles`: render planar tiles
+### `sfc tiles`: render planar tiles
 
 ```sh
-krpatch snes tiles game.sfc 1C0000 2000 font.png --bpp 2
-krpatch snes tiles game.sfc 1C0000 2000 font.png --bpp 2 --rows 12 --stride 20   # 8x12 glyphs in 0x20-byte slots
-krpatch snes tiles vram.bin 4000 2000 vram.png --bpp 2 --tall                    # 8x16 glyphs from tile pairs
+krpatch sfc tiles game.sfc 1C0000 2000 font.png --bpp 2
+krpatch sfc tiles game.sfc 1C0000 2000 font.png --bpp 2 --rows 12 --stride 20   # 8x12 glyphs in 0x20-byte slots
+krpatch sfc tiles vram.bin 4000 2000 vram.png --bpp 2 --tall                    # 8x16 glyphs from tile pairs
 ```
 
 START and LENGTH are byte offsets into any file (ROM, VRAM dump, decompressed data).
 
-### `snes bg`, `snes bgrefs`: BG layers from VRAM/CGRAM dumps
+### `sfc bg`, `sfc bgrefs`: BG layers from VRAM/CGRAM dumps
 
 ```sh
-krpatch snes bg vram.bin cgram.bin 0 0x1000 4 bg1.png             # tilemap and CHR word addresses, bpp
-krpatch snes bgrefs vram.bin --layer 0:0x1000:4 --layer 0x400:0x2000:4 --layer 0x800:0x3000:2 --range 6000-7FFF
+krpatch sfc bg vram.bin cgram.bin 0 0x1000 4 bg1.png             # tilemap and CHR word addresses, bpp
+krpatch sfc bgrefs vram.bin --layer 0:0x1000:4 --layer 0x400:0x2000:4 --layer 0x800:0x3000:2 --range 6000-7FFF
 ```
 
 `bgrefs` reports which part of a VRAM range each layer's tilemap uses, for
 finding free VRAM for new glyphs.
 
-### `snes run`: headless libretro runner
+### `sfc run`: headless libretro runner
 
 ```sh
-krpatch snes run cores/snes9x_libretro.dylib game.sfc out/ s_new.txt [save.srm] --watch 7E0010:2
+krpatch sfc run cores/snes9x_libretro.dylib game.sfc out/ s_new.txt [save.srm] --watch 7E0010:2
 ```
 
 Plays an input script and writes `f<frame>.png` screenshots, `end.png`,
@@ -349,22 +349,22 @@ inside what the core exposes). On cores without a WRAM pointer (bsnes,
 Supafaust) each poke is applied as Pro Action Replay cheats for `--cheat-hold`
 frames (default 40); overlapping pokes get their own cheat slots.
 
-`examples/snes/run_all.sh` runs every scenario on every core (and on Mesen 2
+`examples/sfc/run_all.sh` runs every scenario on every core (and on Mesen 2
 with `MESEN`, MesenCE with `MESENCE`) and collects one result line per run.
 
-### `snes lua`: Mesen 2 and MesenCE scripts
+### `sfc lua`: Mesen 2 and MesenCE scripts
 
 ```sh
-krpatch snes lua    # prints the directory of the bundled Lua scripts
+krpatch sfc lua    # prints the directory of the bundled Lua scripts
 ```
 
-Run them with `Mesen --testrunner rom.sfc <script>` and `LIBDIR=$(krpatch snes lua)`:
+Run them with `Mesen --testrunner rom.sfc <script>` and `LIBDIR=$(krpatch sfc lua)`:
 
 | Script | Does |
 | --- | --- |
 | `lib.lua` | shared helpers: screenshots, savestates, memory dumps, input |
 | `boot.lua` | power on, periodic taps (`TAP`, `PERIOD`, `TAPUNTIL`), presses (`SEQ="start@400:3"`), screenshots every `EVERY` frames until `MAXF` |
-| `script.lua` | plays a `krpatch snes run` script (`SCRIPT`, `SRM`, `WATCH_WRAM`, `WATCH_FMT`) with the same parsing rules |
+| `script.lua` | plays a `krpatch sfc run` script (`SCRIPT`, `SRM`, `WATCH_WRAM`, `WATCH_FMT`) with the same parsing rules |
 | `seq.lua` | replays `SEQ="btn:frames,wait:frames"` from a savestate with `POKE`/`WATCH` |
 | `poke_state.lua` | loads `STATE`, writes `POKE` once, saves to `OUT` |
 | `dumpsrm.lua` | writes the save RAM of a savestate to `save.srm` |
@@ -429,8 +429,8 @@ by path.
 
 ```python
 from kr_patch import ips
-from kr_patch.snes import header
-from kr_patch.snes.dis65816 import disasm
+from kr_patch.sfc import header
+from kr_patch.sfc.dis65816 import disasm
 
 rom = open("game.sfc", "rb").read()
 mp = header.detect(rom)                 # LoROM / HiROM / ExHiROM / SA1
@@ -455,7 +455,7 @@ out = rebuild(nds, {fid: lz11.compress(text)})
 ## Planned
 
 - `krpatch nds run`: a headless libretro runner for DS cores, like
-  `snes run`.
+  `sfc run`.
 - `game.toml`: game projects describe their mapper, watched RAM, emulator
   matrix and scenarios in one file, so commands need fewer arguments.
 

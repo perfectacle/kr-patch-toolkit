@@ -1,6 +1,6 @@
 """Minimal 65c816 disassembler. REP/SEP update the M/X width as decoding proceeds.
 
-The cartridge map is injected as a mapper (see kr_patch.snes.mapper), so the same
+The cartridge map is injected as a mapper (see kr_patch.sfc.mapper), so the same
 decoder serves LoROM, HiROM and SA-1 images.
 """
 from .mapper import LoROM

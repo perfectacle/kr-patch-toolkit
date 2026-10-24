@@ -4,6 +4,14 @@ English | [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
 
+- **Breaking:** the Super Famicom tools are now called SFC everywhere. The
+  `krpatch snes …` subcommand is `krpatch sfc …` (`dis`, `checksum`, `tiles`,
+  `bg`, `bgrefs`, `run`, `lua`); the old name is not kept as an alias. The
+  package `kr_patch.snes` is `kr_patch.sfc` (the Lua scripts are under
+  `kr_patch/sfc/lua/`), `tiles.planar_to_snes`/`snes_to_planar` are
+  `planar_to_sfc`/`sfc_to_planar`, and `examples/snes/` is `examples/sfc/`.
+  Command output is unchanged.
+
 ## 0.3.0
 
 - NDS: `krpatch nds info|ls|unpack|pack` and `kr_patch.nds.rom` read a DS ROM's

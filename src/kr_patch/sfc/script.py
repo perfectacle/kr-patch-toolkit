@@ -1,4 +1,4 @@
-"""Input scripts shared by the libretro runner and snes/lua/script.lua (Mesen 2, MesenCE).
+"""Input scripts shared by the libretro runner and sfc/lua/script.lua (Mesen 2, MesenCE).
 
 One command per line, frames counted from power-on (1 = after the first frame):
 

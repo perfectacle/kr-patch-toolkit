@@ -33,7 +33,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends lua5.4 xdelta3
 
       - name: Check Lua syntax
-        run: find src/kr_patch/snes/lua -name '*.lua' -print0 | xargs -0 -n1 luac5.4 -p
+        run: find src/kr_patch/sfc/lua -name '*.lua' -print0 | xargs -0 -n1 luac5.4 -p
 
       - run: uv sync --locked
 
@@ -47,7 +47,7 @@ jobs:
           krpatch="$RUNNER_TEMP/wheel-venv/bin/krpatch"
           "$krpatch" --version
           "$krpatch" audio --help
-          test -f "$("$krpatch" snes lua)/lib.lua"
+          test -f "$("$krpatch" sfc lua)/lib.lua"
 
   lint:
     runs-on: ubuntu-26.04-arm

@@ -29,8 +29,8 @@ description: 한국어 문서(README.ko.md, CHANGELOG.ko.md)를 쓰거나 고칠
 | 개념                                  | 쓸 말                                    |
 | ------------------------------------- | ---------------------------------------- |
 | ROM / dump                            | 롬 / 덤프                                |
-| platform(SNES, NDS)                   | 기종                                     |
-| Super Famicom                         | 슈퍼패미컴(SNES)                         |
+| platform(SFC, NDS)                    | 기종                                     |
+| Super Famicom                         | 슈퍼 패미콤(SFC)                         |
 | font(롬 안의 글자 데이터) / glyph     | 폰트 / 글리프                            |
 | typeface(시스템·배포 서체)            | 글꼴                                     |
 | loop(음악)                            | 반복(구간), 반복 재생                    |

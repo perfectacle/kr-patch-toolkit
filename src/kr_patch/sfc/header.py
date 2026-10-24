@@ -26,7 +26,7 @@ def _mirror_sum(d, size):
 
 
 def checksum(rom):
-    """SNES checksum of a headerless image.
+    """SFC checksum of a headerless image.
 
     Sizes that are not a power of two are summed as the cartridge mirrors them:
     the largest power-of-two part, then the remainder repeated up to that size.

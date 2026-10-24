@@ -46,20 +46,20 @@ def cmd_diff(a):
 
 def cmd_lzss_decode(a):
     from . import lzss
-    from .snes.tiles import planar_to_snes
+    from .sfc.tiles import planar_to_sfc
     data, n = lzss.decompress(_read(a.file), a.offset)
     if a.planar:
-        data = planar_to_snes(data)
+        data = planar_to_sfc(data)
     Path(a.out).write_bytes(data)
     print(f"{len(data)} bytes from {n} compressed")
 
 
 def cmd_lzss_encode(a):
     from . import lzss
-    from .snes.tiles import snes_to_planar
+    from .sfc.tiles import sfc_to_planar
     data = _read(a.file)
     if a.planar:
-        data = snes_to_planar(data)
+        data = sfc_to_planar(data)
     out = lzss.compress(data)
     Path(a.out).write_bytes(out)
     print(f"{len(out)} bytes from {len(data)}")
@@ -417,22 +417,22 @@ def _audio_parser(sub):
     p.set_defaults(fn=cmd_loudness)
 
 
-# SNES commands
+# SFC commands
 
 def _mapper(name, rom):
-    from .snes import header, mapper
+    from .sfc import header, mapper
     return header.detect(rom) if name == "auto" else mapper.get(name)
 
 
 def cmd_dis(a):
-    from .snes.dis65816 import disasm
-    from .snes.header import strip_copier
+    from .sfc.dis65816 import disasm
+    from .sfc.header import strip_copier
     rom = strip_copier(_read(a.rom))
     print(disasm(rom, a.addr, a.count, not a.m16, not a.x16, _mapper(a.mapper, rom)))
 
 
 def cmd_checksum(a):
-    from .snes import header
+    from .sfc import header
     data = _read(a.rom)
     pre = data[:header.COPIER] if header.has_copier(data) else b""
     rom = data[len(pre):]
@@ -455,7 +455,7 @@ def cmd_checksum(a):
 
 
 def cmd_tiles(a):
-    from .snes.tiles import render
+    from .sfc.tiles import render
     data = _read(a.file)
     im = render(data, a.start, a.length // (a.stride or a.bpp * a.rows), a.bpp, rows=a.rows,
                 stride=a.stride, cols=a.cols, scale=a.scale, tall=a.tall)
@@ -464,12 +464,12 @@ def cmd_tiles(a):
 
 
 def cmd_bg(a):
-    from .snes import bg
+    from .sfc import bg
     bg.render(_read(a.vram), _read(a.cgram), a.map, a.chr, a.bpp, a.palbase, a.scale).save(a.out)
 
 
 def cmd_bgrefs(a):
-    from .snes import bg
+    from .sfc import bg
     vram = _read(a.vram)
     lo, hi = (int(x, 16) for x in a.range.split("-"))
     for i, spec in enumerate(a.layer, 1):
@@ -479,7 +479,7 @@ def cmd_bgrefs(a):
 
 
 def cmd_run(a):
-    from .snes import libretro, script
+    from .sfc import libretro, script
     watches = [script.Watch.parse(w, a.watch_fmt) for w in a.watch]
     variables = dict(v.split("=", 1) for v in a.var)
     r = libretro.Runner(a.core, a.rom, a.out, script.load(a.script), a.srm, watches, variables,
@@ -493,19 +493,19 @@ def cmd_run(a):
 
 
 def lua_dir():
-    return Path(__file__).resolve().parent / "snes" / "lua"
+    return Path(__file__).resolve().parent / "sfc" / "lua"
 
 
 def cmd_lua(a):
     print(lua_dir())
 
 
-def _snes_parser(sub):
-    snes = sub.add_parser("snes", help="SNES (Super Famicom) tools").add_subparsers(
-        dest="snes_cmd", required=True, metavar="command")
+def _sfc_parser(sub):
+    sfc = sub.add_parser("sfc", help="SFC (Super Famicom) tools").add_subparsers(
+        dest="sfc_cmd", required=True, metavar="command")
     mappers = ["auto", "lorom", "hirom", "exhirom", "sa1"]
 
-    p = snes.add_parser("dis", help="disassemble 65c816 code")
+    p = sfc.add_parser("dis", help="disassemble 65c816 code")
     p.add_argument("rom")
     p.add_argument("addr", type=_hex, help="CPU address in hex, e.g. 808000")
     p.add_argument("count", type=int, nargs="?", default=40)
@@ -514,13 +514,13 @@ def _snes_parser(sub):
     p.add_argument("--x16", action="store_true", help="start with 16-bit index registers")
     p.set_defaults(fn=cmd_dis)
 
-    p = snes.add_parser("checksum", help="check or fix the internal header checksum")
+    p = sfc.add_parser("checksum", help="check or fix the internal header checksum")
     p.add_argument("rom")
     p.add_argument("--fix", action="store_true", help="rewrite the checksum in place")
     p.add_argument("--mapper", choices=mappers, default="auto")
     p.set_defaults(fn=cmd_checksum)
 
-    p = snes.add_parser("tiles", help="render planar tiles to PNG")
+    p = sfc.add_parser("tiles", help="render planar tiles to PNG")
     p.add_argument("file")
     p.add_argument("start", type=_hex, help="byte offset (hex)")
     p.add_argument("length", type=_hex, help="byte length (hex)")
@@ -533,7 +533,7 @@ def _snes_parser(sub):
     p.add_argument("--tall", action="store_true", help="stack tile pairs into 8x16 glyphs")
     p.set_defaults(fn=cmd_tiles)
 
-    p = snes.add_parser("bg", help="render a BG layer from VRAM and CGRAM dumps")
+    p = sfc.add_parser("bg", help="render a BG layer from VRAM and CGRAM dumps")
     p.add_argument("vram")
     p.add_argument("cgram")
     p.add_argument("map", type=_int, help="tilemap VRAM word address")
@@ -544,14 +544,14 @@ def _snes_parser(sub):
     p.add_argument("--scale", type=int, default=3)
     p.set_defaults(fn=cmd_bg)
 
-    p = snes.add_parser("bgrefs", help="which VRAM bytes each BG tilemap references")
+    p = sfc.add_parser("bgrefs", help="which VRAM bytes each BG tilemap references")
     p.add_argument("vram")
     p.add_argument("--layer", action="append", required=True, metavar="MAP:CHR:BPP",
                    help="word addresses (decimal or 0x..), repeat per layer")
     p.add_argument("--range", default="0000-FFFF", help="VRAM byte range in hex, e.g. 6000-7FFF")
     p.set_defaults(fn=cmd_bgrefs)
 
-    p = snes.add_parser("run", help="play an input script on a libretro core")
+    p = sfc.add_parser("run", help="play an input script on a libretro core")
     p.add_argument("core", help="libretro core (.dylib/.so/.dll)")
     p.add_argument("rom")
     p.add_argument("out")
@@ -567,7 +567,7 @@ def _snes_parser(sub):
     p.add_argument("-v", "--verbose", action="store_true", help="print core log and environment calls")
     p.set_defaults(fn=cmd_run)
 
-    p = snes.add_parser("lua", help="print the directory of the bundled Mesen 2 / MesenCE Lua scripts")
+    p = sfc.add_parser("lua", help="print the directory of the bundled Mesen 2 / MesenCE Lua scripts")
     p.set_defaults(fn=cmd_lua)
 
 
@@ -644,7 +644,7 @@ def build_parser():
     q.add_argument("base")
     q.add_argument("patched")
     q.add_argument("out")
-    q.add_argument("--headered", metavar="OUT", help="also write a patch for SNES dumps with a 512-byte copier header")
+    q.add_argument("--headered", metavar="OUT", help="also write a patch for SFC dumps with a 512-byte copier header")
     q.add_argument("--gap", type=int, default=6, help="equal bytes that end a record (default 6)")
     q.set_defaults(fn=cmd_ips_make)
     q = ips.add_parser("apply")
@@ -659,12 +659,12 @@ def build_parser():
     q.add_argument("file")
     q.add_argument("offset", type=_hex)
     q.add_argument("out")
-    q.add_argument("--planar", action="store_true", help="re-interleave planar SNES 2bpp halves to SNES order")
+    q.add_argument("--planar", action="store_true", help="re-interleave planar SFC 2bpp halves to SFC order")
     q.set_defaults(fn=cmd_lzss_decode)
     q = lz.add_parser("encode")
     q.add_argument("file")
     q.add_argument("out")
-    q.add_argument("--planar", action="store_true", help="split SNES 2bpp tiles into planar halves first")
+    q.add_argument("--planar", action="store_true", help="split SFC 2bpp tiles into planar halves first")
     q.set_defaults(fn=cmd_lzss_encode)
 
     p = sub.add_parser("diff", help="list byte ranges where two files differ")
@@ -746,7 +746,7 @@ def build_parser():
     p.set_defaults(fn=cmd_linear)
 
     _audio_parser(sub)
-    _snes_parser(sub)
+    _sfc_parser(sub)
     _nds_parser(sub)
     return ap
 

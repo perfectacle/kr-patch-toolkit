@@ -1,4 +1,4 @@
--- Play a `krpatch snes run` input script on Mesen 2, so every emulator gets the same input.
+-- Play a `krpatch sfc run` input script on Mesen 2, so every emulator gets the same input.
 -- Mesen 2 --testrunner; env: LIBDIR SCRIPT SHOT_DIR [SRM] [WATCH_WRAM="7E0010:2,..."] [WATCH_FMT="%06X"]
 -- SRM is copied into the save RAM on the first frames, as the libretro runner does.
 -- Writes f<frame>.png, end.png, wram_<frame>.bin/sram_<frame>.bin for dumps, and wram.log.

@@ -1,5 +1,5 @@
-from kr_patch.snes import mapper
-from kr_patch.snes.dis65816 import decode, disasm
+from kr_patch.sfc import mapper
+from kr_patch.sfc.dis65816 import decode, disasm
 
 # REP #$30; LDA #$1234; LDX #$5678; SEP #$20; LDA #$9A; BRA -2; JSL $C08000;
 # MVN $7E,$7F (source $7E, destination $7F: encoded 54 7F 7E); BRL +0; PEI ($12)
