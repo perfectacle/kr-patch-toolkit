@@ -7,7 +7,7 @@
 곁들인 비트맵 글리프 도구, 녹음에서 끊김 없이 반복되는 배경음악 잘라 내기),
 나머지는 슈퍼패미컴(SNES)용입니다: 카트리지 매퍼,
 헤더 체크섬, 65c816 디스어셈블러, 타일·BG 렌더링, 헤드리스 libretro 테스트
-실행기, Mesen 2 Lua 스크립트. 다른 기종(NDS 부터)도 지원할 예정이며, 기종마다
+실행기, Mesen 2·MesenCE 용 Lua 스크립트. 다른 기종(NDS 부터)도 지원할 예정이며, 기종마다
 `krpatch <기종>` 명령을 따로 둡니다.
 
 여러 한글 패치가 함께 쓰는 부분을 모은 것입니다. 한 게임에만 해당하는 것
@@ -49,7 +49,7 @@ pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.2.0
 | `krpatch snes tiles` | planar 타일 렌더링 |
 | `krpatch snes bg`, `bgrefs` | VRAM/CGRAM 덤프에서 BG 레이어 |
 | `krpatch snes run` | 헤드리스 libretro 실행기 |
-| `krpatch snes lua` | 함께 들어 있는 Mesen 2 Lua 스크립트 경로 |
+| `krpatch snes lua` | 함께 들어 있는 Mesen 2·MesenCE 용 Lua 스크립트 경로 |
 
 ### `ips`: IPS 패치 생성·적용
 
@@ -300,10 +300,10 @@ krpatch snes run cores/snes9x_libretro.dylib game.sfc out/ s_new.txt [save.srm] 
 Action Replay 치트로 `--cheat-hold` 프레임(기본값 40) 동안 적용하며, 겹치는
 poke 는 치트 슬롯을 따로 씁니다.
 
-`examples/snes/run_all.sh` 는 모든 시나리오를 모든 코어(와 Mesen 2)에서 돌리고
-실행마다 결과 한 줄을 모읍니다.
+`examples/snes/run_all.sh` 는 모든 시나리오를 모든 코어에서 돌리고(`MESEN` 을
+주면 Mesen 2, `MESENCE` 를 주면 MesenCE 에서도) 실행마다 결과 한 줄을 모읍니다.
 
-### `snes lua`: Mesen 2 스크립트
+### `snes lua`: Mesen 2·MesenCE 스크립트
 
 ```sh
 krpatch snes lua    # 함께 들어 있는 Lua 스크립트의 디렉터리를 출력
@@ -326,6 +326,17 @@ krpatch snes lua    # 함께 들어 있는 Lua 스크립트의 디렉터리를 �
 
 모두 출력 파일을 `SHOT_DIR` 에 씁니다. `script.lua` 에는 `WATCH` 대신
 `WATCH_WRAM` 을 쓰세요. zsh 가 `WATCH` 와 `WATCHFMT` 를 자체 파라미터로 씁니다.
+
+Mesen 2 는 2.1.1 이 마지막 버전이고, 저장소(SourMesen/Mesen2)는 2026년 6월에
+보관 처리됐습니다. 뒤를 잇는 것은 MesenCE(nesdev-org/MesenCE)입니다. 실행
+파일 이름이 그대로 `Mesen` 이라 위 명령을 두 판에서 똑같이 씁니다. MesenCE 는
+`MesenCE` 폴더(macOS 에서는 `~/Library/Application Support/MesenCE`)가 있으면
+거기에, 없으면 `Mesen2` 폴더에 데이터를 두고, 세이브는 그 안의 `Saves` 에
+있습니다. 여기 들어 있는 스크립트는 모두 시험 롬으로 Mesen 2.1.1 과 MesenCE
+2.2.1 에서 전원을 켤 때 RAM 을 0 으로 채워(`--snes.ramPowerOnState=AllZeros`)
+돌려 봤습니다. 스크린샷, 메모리 덤프, 기록은 두 판이 같았고, 다른 곳은 한 판
+안에서도 실행마다 달라지는 부분뿐이었습니다. 세이브 스테이트 파일만 바이트가
+다릅니다.
 
 ## Python API
 

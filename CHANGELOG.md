@@ -4,6 +4,12 @@ English | [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
 
+- `examples/snes/run_all.sh`: `MESENCE` (save folder `MESENCE_SAVES`) also runs
+  every scenario on MesenCE, the successor of the archived Mesen 2. `MESEN`
+  runs Mesen 2 as before.
+- The bundled Lua scripts (`krpatch snes lua`) were checked on Mesen 2.1.1 and
+  MesenCE 2.2.1 and work unchanged on both.
+
 ## 0.2.0
 
 Tools for recorded game music. Requires numpy 2.5.2 or newer.

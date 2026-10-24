@@ -7,7 +7,8 @@ platform-independent (IPS patches, an LZSS codec, file diffs, screenshot
 comparison, bitmap glyph tools with macOS OCR, seamless music loops cut from
 recordings); the rest are for the SNES
 (Super Famicom): cartridge mappers, header checksums, a 65c816 disassembler,
-tile and BG rendering, a headless libretro test runner and Mesen 2 Lua scripts.
+tile and BG rendering, a headless libretro test runner and Lua scripts for
+Mesen 2 and MesenCE.
 Other platforms (NDS first) are planned and will get their own `krpatch <platform>`
 commands.
 
@@ -49,7 +50,7 @@ Addresses and offsets are hex unless stated otherwise.
 | `krpatch snes tiles` | render planar tiles |
 | `krpatch snes bg`, `bgrefs` | BG layers from VRAM/CGRAM dumps |
 | `krpatch snes run` | headless libretro runner |
-| `krpatch snes lua` | path of the bundled Mesen 2 Lua scripts |
+| `krpatch snes lua` | path of the bundled Lua scripts for Mesen 2 and MesenCE |
 
 ### `ips`: create and apply IPS patches
 
@@ -297,10 +298,10 @@ inside what the core exposes). On cores without a WRAM pointer (bsnes,
 Supafaust) each poke is applied as Pro Action Replay cheats for `--cheat-hold`
 frames (default 40); overlapping pokes get their own cheat slots.
 
-`examples/snes/run_all.sh` runs every scenario on every core (and Mesen 2) and
-collects one result line per run.
+`examples/snes/run_all.sh` runs every scenario on every core (and on Mesen 2
+with `MESEN`, MesenCE with `MESENCE`) and collects one result line per run.
 
-### `snes lua`: Mesen 2 scripts
+### `snes lua`: Mesen 2 and MesenCE scripts
 
 ```sh
 krpatch snes lua    # prints the directory of the bundled Lua scripts
@@ -323,6 +324,17 @@ Run them with `Mesen --testrunner rom.sfc <script>` and `LIBDIR=$(krpatch snes l
 
 All write their output files to `SHOT_DIR`. Use `WATCH_WRAM`, not `WATCH`, for
 `script.lua`: zsh treats `WATCH` and `WATCHFMT` as its own parameters.
+
+Mesen 2 ended at 2.1.1, and its repository (SourMesen/Mesen2) was archived in
+June 2026. MesenCE (nesdev-org/MesenCE) continues it; its executable is still
+`Mesen`, so the command above works with either. MesenCE keeps its data in a
+`MesenCE` folder (`~/Library/Application Support/MesenCE` on macOS) when that
+folder exists and falls back to the `Mesen2` folder otherwise; saves are in
+`Saves` inside it. Every script here was run on a test ROM with Mesen 2.1.1
+and MesenCE 2.2.1 with power-on RAM set to zeros
+(`--snes.ramPowerOnState=AllZeros`): screenshots, memory dumps and logs were
+the same in both, apart from the run-to-run differences each version shows on
+its own. Only the save state files are not byte for byte the same.
 
 ## Python API
 

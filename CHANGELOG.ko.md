@@ -4,6 +4,12 @@
 
 ## 미출시
 
+- `examples/snes/run_all.sh`: `MESENCE`(세이브 폴더는 `MESENCE_SAVES`)를 주면
+  보관 처리된 Mesen 2 의 후속인 MesenCE 에서도 모든 시나리오를 돌립니다.
+  `MESEN` 은 전과 같이 Mesen 2 를 돌립니다.
+- 함께 들어 있는 Lua 스크립트(`krpatch snes lua`)를 Mesen 2.1.1 과 MesenCE
+  2.2.1 에서 확인했습니다. 고치지 않고 두 판에서 그대로 돌아갑니다.
+
 ## 0.2.0
 
 녹음한 게임 음악을 다루는 도구를 더했습니다. numpy 2.5.2 이상이 필요합니다.
