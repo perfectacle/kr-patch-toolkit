@@ -24,7 +24,7 @@ FC(패미컴): iNES 헤더, 커버리지 리스팅을 곁들인 6502 디스어�
 Python 3.15 이상이 필요합니다.
 
 ```sh
-pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.4.0
+pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.5.0
 ```
 
 `krpatch` 명령과 `kr_patch` 패키지가 설치됩니다. 게임 프로젝트에서는

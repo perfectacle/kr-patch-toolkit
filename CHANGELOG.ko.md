@@ -4,6 +4,8 @@
 
 ## 미출시
 
+## 0.5.0
+
 - FC(패미컴): `krpatch fc info|dis|listing|lua`. `kr_patch.fc.ines` 가 iNES·
   NES 2.0 헤더를 읽고, `kr_patch.fc.dis6502` 가 6502 코드를 PRG 오프셋과 CPU
   주소로 디스어셈블하며 커버리지로 실행된 명령만 리스팅합니다.
