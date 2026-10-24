@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.15"
 
 [options]
-exclude-newer = "2026-10-16T22:18:03.563394Z"
+exclude-newer = "2026-10-17T10:45:30.824785Z"
 exclude-newer-span = "P7D"
 
 [[package]]
@@ -161,7 +161,7 @@ wheels = [
 
 [[package]]
 name = "kr-patch-toolkit"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },
