@@ -5,7 +5,7 @@ description: 도구 코드(src/kr_patch, Lua 스크립트, tests)를 바꾸거�
 
 # 도구 코드
 
-이 스킬이 COMPAT-01, SCOPE-01, ROM-01, DOC-01 의 정본이다. 구조: 기종 무관 도구는 `src/kr_patch/`(`ips`·`lzss`·`diff`·`shots`·`glyph`·`audio`), SFC 전용은 `src/kr_patch/sfc/`(매퍼·체크섬·디스어셈블러·타일·libretro 실행기), Mesen 2·MesenCE Lua 스크립트는 `src/kr_patch/sfc/lua/`, 명령 정의는 `src/kr_patch/cli.py` 한 곳이다. 새 기종은 `src/kr_patch/<기종>/` 과 `krpatch <기종>` 하위 명령으로 둔다.
+이 스킬이 COMPAT-01, SCOPE-01, ROM-01, DOC-01 의 정본이다. 구조: 기종 무관 도구는 `src/kr_patch/`(`ips`·`lzss`·`diff`·`shots`·`glyph`·`audio`), SFC 전용은 `src/kr_patch/sfc/`(매퍼·체크섬·디스어셈블러·타일·libretro 실행기), Mesen 2·MesenCE Lua 스크립트는 `src/kr_patch/sfc/lua/`, FC(패미컴) 전용은 `src/kr_patch/fc/`(iNES 헤더·6502 디스어셈블러, MesenCE Lua 는 `fc/lua/`), 명령 정의는 `src/kr_patch/cli.py` 한 곳이다. 새 기종은 `src/kr_patch/<기종>/` 과 `krpatch <기종>` 하위 명령으로 둔다.
 
 ## 절차
 
@@ -20,7 +20,7 @@ description: 도구 코드(src/kr_patch, Lua 스크립트, tests)를 바꾸거�
    uv sync --locked
    uv run pytest -q
    uv run ruff check .
-   find src/kr_patch/sfc/lua -name '*.lua' -print0 | xargs -0 -n1 luac -p   # Lua 를 고쳤으면
+   find src/kr_patch/sfc/lua src/kr_patch/fc/lua -name '*.lua' -print0 | xargs -0 -n1 luac -p   # Lua 를 고쳤으면
    ```
    완료: 전부 통과.
 5. **PR 로 올린다** — [git-workflow](../git-workflow/SKILL.md).

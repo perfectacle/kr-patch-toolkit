@@ -8,7 +8,8 @@
 녹음에서 끊김 없이 반복되는 배경음악 잘라 내기), 나머지는 기종별입니다.
 슈퍼 패미콤(SFC): 카트리지 매퍼, 헤더 체크섬, 65c816 디스어셈블러, 타일·BG
 렌더링, 헤드리스 libretro 테스트 실행기, Mesen 2·MesenCE 용 Lua 스크립트.
-NDS: 롬 이미지 읽기·풀기·다시 묶기. 기종마다 `krpatch <기종>` 명령을 따로
+FC(패미컴): iNES 헤더, 커버리지 리스팅을 곁들인 6502 디스어셈블러, MesenCE 용 Lua
+프로브. NDS: 롬 이미지 읽기·풀기·다시 묶기. 기종마다 `krpatch <기종>` 명령을 따로
 둡니다.
 
 여러 한글 패치가 함께 쓰는 부분을 모은 것입니다. 한 게임에만 해당하는 것
@@ -54,6 +55,9 @@ pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.4.0
 | `krpatch sfc bg`, `bgrefs` | VRAM/CGRAM 덤프에서 BG 레이어 |
 | `krpatch sfc run` | 헤드리스 libretro 실행기 |
 | `krpatch sfc lua` | 함께 들어 있는 Mesen 2·MesenCE 용 Lua 스크립트 경로 |
+| `krpatch fc info` | iNES / NES 2.0 헤더 |
+| `krpatch fc dis`, `listing` | 6502 코드 디스어셈블, 커버리지로 실행된 것만 |
+| `krpatch fc lua` | 함께 들어 있는 FC 용 MesenCE Lua 스크립트 경로 |
 | `krpatch nds info\|ls` | NDS 헤더, 표, 파일 목록 |
 | `krpatch nds unpack\|pack` | NDS 파일시스템을 폴더로 풀고 다시 롬으로 묶기 |
 
@@ -385,6 +389,68 @@ Mesen 2 는 2.1.1 이 마지막 버전이고, 저장소(SourMesen/Mesen2)는 202
 돌려 봤습니다. 스크린샷, 메모리 덤프, 기록은 두 판이 같았고, 다른 곳은 한 판
 안에서도 실행마다 달라지는 부분뿐이었습니다. 세이브 스테이트 파일만 바이트가
 다릅니다.
+
+## FC 명령
+
+FC(패미컴) PRG ROM 은 오프셋과 그 코드가 실행되는 CPU 주소로 가리킵니다. 매퍼가
+같은 뱅크를 다른 주소에 둘 수 있기 때문입니다. 디스어셈블 줄의 `BB:AAAA` 는 PRG
+뱅크(`--bank-size` 로 8 이나 32 를 주지 않으면 16KB 단위)와 CPU 주소입니다.
+
+### `fc info`: iNES 헤더
+
+```sh
+krpatch fc info game.nes
+# iNES mapper=1 prg=512K chr=0 (CHR-RAM) mirroring=horizontal battery=yes trainer=no
+```
+
+iNES 와 NES 2.0 헤더를 읽습니다. 헤더 12~15번 바이트에 글자가 들어 있는 옛 덤프는
+에뮬레이터처럼 매퍼 번호의 아래 4비트만 씁니다.
+
+### `fc dis`, `fc listing`: 6502 코드 디스어셈블
+
+```sh
+krpatch fc dis game.nes C000 40              # 마지막 뱅크를 $C000 에 둔 것으로
+krpatch fc dis game.nes 8000 40 --bank 5     # 5번 뱅크를 $8000 에 둔 것으로
+krpatch fc dis game.nes 8000 40 --offset 14000
+krpatch fc listing game.nes cover.txt --range 3C000-3FFFF
+```
+
+공식 명령만 풀고 나머지 바이트는 `.db` 로 찍습니다. `listing` 은
+`probe/cover.lua` 로 모은, 실제로 실행된 명령만 실행 횟수와 함께 찍고, 실행이
+건너뛴 곳은 빈 줄로 띄웁니다.
+
+### `fc lua`: MesenCE 스크립트
+
+```sh
+krpatch fc lua    # 함께 들어 있는 Lua 스크립트의 디렉터리를 출력
+```
+
+`Mesen --testrunner game.nes <script>` 와 `LIBDIR=$(krpatch fc lua)` 로
+실행합니다. 결과 파일은 모두 `SHOT_DIR` 에 씁니다.
+
+| 스크립트 | 하는 일 |
+| --- | --- |
+| `lib.lua` | 공용 함수: 스크린샷, 세이브스테이트, 보드에 있는 모든 RAM 덤프, 입력, CPU 주소의 PRG 오프셋 |
+| `boot.lua` | 전원 켜기, 주기적 입력(`TAP`, `PERIOD`, `TAPUNTIL`), 지정 입력(`SEQ="start@400:3"`), `MAXF` 까지 `EVERY` 프레임마다 스크린샷(SFC 판과 같음) |
+| `seq.lua` | `STATE` 에서 `SEQ="btn:frames,wait:frames"` 를 재생, `POKE`/`WATCH`(CPU 주소). 끝에 `end.png`, `end.mss` 와 `end.ram`, `end.wram`, `end.sram`, `end.chr`, `end.nt`, `end.pal`, `end.oam` |
+| `mkstate.lua` | 입력 드라이버를 돌리고 `SAVEAT` 프레임에 세이브스테이트 `STATE_OUT` 과 스크린샷 저장 |
+| `probe/cover.lua` | `FROM`~`TO` 에 실행된 PRG ROM 오프셋과 CPU 주소·횟수: `fc listing` 용 `cover.txt` |
+| `probe/reads.lua` | `FROM`~`TO` 의 PRG ROM 데이터 읽기를 읽은 명령별로(횟수, 오프셋 범위, 처음 프레임): `reads.txt` |
+| `probe/writes.lua` | `FROM` 부터 `WATCH="0000-07FF,8000-FFFF"` 에 쓰는 명령과 PRG 오프셋, 처음 프레임, 횟수, 예시: `writes.txt`. `8000-FFFF` 를 주면 매퍼 레지스터 쓰기가 보임 |
+| `probe/trace.lua` | `TRACE` 주소가 실행될 때마다 PRG 오프셋, A X Y S P, `LOG` 바이트: `trace.txt` |
+| `probe/watch.lua` | `WF`~`WT` 프레임 동안 `WATCH="0050,0051:2"` 값이 바뀔 때마다 한 줄: `watch.txt` |
+
+프로브는 입력에 `boot.lua` 를 씁니다. 세이브스테이트에서 시작하려면
+`DRIVER=$LIBDIR/seq.lua`(와 `STATE`, `SEQ`)를 줍니다. 프로브는 `MAXF - 1`(또는
+`TO`) 프레임에 결과 파일을 쓰고, `seq.lua` 는 마지막 입력 뒤 `TAIL` 프레임에
+멈추므로 그 프레임까지 가도록 `TAIL` 을 넉넉히 줍니다.
+
+Mesen 은 PRG ROM 에 건 메모리 콜백에도 CPU 주소를 넘기고, 쓰기 콜백 때의 PC 는
+다음 명령을 가리킵니다. 그래서 프로브는 `emu.convertAddress` 로 주소를 바꾸고,
+쓰기를 한 PC 는 직전 실행 콜백에서 가져옵니다. 6502 는 더미 읽기(1바이트 명령
+다음 바이트, 분기 목적지, 복귀 주소, 인터럽트가 걸릴 때 다음 명령)와 인터럽트
+벡터 읽기도 하므로, `reads.lua` 는 메모리 피연산자가 있는 명령의 읽기만 세고 그런
+읽기는 뺍니다.
 
 ## NDS 명령
 

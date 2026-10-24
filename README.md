@@ -8,9 +8,10 @@ codecs, file diffs, screenshot comparison, bitmap glyph tools with macOS OCR,
 linear bitmap rendering, seamless music loops cut from recordings); the rest
 are for a platform. SFC (Super Famicom): cartridge mappers, header checksums,
 a 65c816 disassembler, tile and BG rendering, a headless libretro test runner
-and Lua scripts for Mesen 2 and MesenCE. NDS: reading, unpacking and
-rebuilding ROM images. Each platform has its own `krpatch <platform>`
-commands.
+and Lua scripts for Mesen 2 and MesenCE. FC (Famicom): iNES headers,
+a 6502 disassembler with coverage listings and MesenCE Lua probes. NDS:
+reading, unpacking and rebuilding ROM images. Each platform has its own
+`krpatch <platform>` commands.
 
 It is the shared part of several Korean translation patches. Anything specific
 to one game (script formats, pointer tables, RAM addresses) stays in that
@@ -54,6 +55,9 @@ Addresses and offsets are hex unless stated otherwise.
 | `krpatch sfc bg`, `bgrefs` | BG layers from VRAM/CGRAM dumps |
 | `krpatch sfc run` | headless libretro runner |
 | `krpatch sfc lua` | path of the bundled Lua scripts for Mesen 2 and MesenCE |
+| `krpatch fc info` | iNES / NES 2.0 header |
+| `krpatch fc dis`, `listing` | disassemble 6502 code, or only what a coverage run executed |
+| `krpatch fc lua` | path of the bundled MesenCE Lua scripts for FC |
 | `krpatch nds info\|ls` | NDS header, tables and file list |
 | `krpatch nds unpack\|pack` | NDS file system to a folder and back into a ROM |
 
@@ -386,6 +390,70 @@ and MesenCE 2.2.1 with power-on RAM set to zeros
 (`--snes.ramPowerOnState=AllZeros`): screenshots, memory dumps and logs were
 the same in both, apart from the run-to-run differences each version shows on
 its own. Only the save state files are not byte for byte the same.
+
+## FC commands
+
+FC (Famicom) PRG ROM is addressed by its offset and the CPU address the code
+runs at, because a mapper can put the same bank at different addresses.
+Disassembly lines are labelled `BB:AAAA`: the PRG bank (16 KB unless
+`--bank-size` says 8 or 32) and the CPU address.
+
+### `fc info`: iNES header
+
+```sh
+krpatch fc info game.nes
+# iNES mapper=1 prg=512K chr=0 (CHR-RAM) mirroring=horizontal battery=yes trainer=no
+```
+
+Reads iNES and NES 2.0 headers. Old dumps with text in header bytes 12-15
+get the low mapper nibble only, as emulators do.
+
+### `fc dis`, `fc listing`: disassemble 6502 code
+
+```sh
+krpatch fc dis game.nes C000 40              # the last bank, mapped at $C000
+krpatch fc dis game.nes 8000 40 --bank 5     # bank 5 mapped at $8000
+krpatch fc dis game.nes 8000 40 --offset 14000
+krpatch fc listing game.nes cover.txt --range 3C000-3FFFF
+```
+
+Official opcodes only; any other byte prints as `.db`. `listing` prints only
+the instructions a `probe/cover.lua` run executed, with their execution
+counts, and a blank line where execution skipped bytes.
+
+### `fc lua`: MesenCE scripts
+
+```sh
+krpatch fc lua    # prints the directory of the bundled Lua scripts
+```
+
+Run them with `Mesen --testrunner game.nes <script>` and
+`LIBDIR=$(krpatch fc lua)`. Every script writes to `SHOT_DIR`.
+
+| Script | Does |
+| --- | --- |
+| `lib.lua` | shared helpers: screenshots, savestates, dumps of every RAM the board has, input, PRG offset of a CPU address |
+| `boot.lua` | power on, periodic taps (`TAP`, `PERIOD`, `TAPUNTIL`), presses (`SEQ="start@400:3"`), screenshots every `EVERY` frames until `MAXF` (same as the SFC one) |
+| `seq.lua` | replays `SEQ="btn:frames,wait:frames"` from `STATE` with `POKE`/`WATCH` (CPU addresses); at the end `end.png`, `end.mss` and `end.ram`, `end.wram`, `end.sram`, `end.chr`, `end.nt`, `end.pal`, `end.oam` |
+| `mkstate.lua` | runs the input driver and saves a savestate `STATE_OUT` and a screenshot at frame `SAVEAT` |
+| `probe/cover.lua` | PRG ROM offsets executed from `FROM` to `TO`, with CPU address and count: `cover.txt` for `fc listing` |
+| `probe/reads.lua` | PRG ROM data reads from `FROM` to `TO` per reading instruction (count, offset range, first frame): `reads.txt` |
+| `probe/writes.lua` | instructions writing to `WATCH="0000-07FF,8000-FFFF"` from `FROM`, with PRG offset, first frame, count and a sample: `writes.txt`; mapper register writes show up with `8000-FFFF` |
+| `probe/trace.lua` | each execution of the `TRACE` addresses with PRG offset, A X Y S P and the `LOG` bytes: `trace.txt` |
+| `probe/watch.lua` | values at `WATCH="0050,0051:2"` from frame `WF` to `WT`, a line each time they change: `watch.txt` |
+
+Probes run `boot.lua` for input. Set `DRIVER=$LIBDIR/seq.lua` (with `STATE`
+and `SEQ`) to start from a savestate instead. Probes write their file at frame
+`MAXF - 1` (or `TO`); `seq.lua` stops `TAIL` frames after its last step, so
+give it a `TAIL` long enough to reach that frame.
+
+Mesen hands memory callbacks the CPU address even when they are registered on
+PRG ROM, and a write callback sees the next instruction's PC; the probes
+convert addresses with `emu.convertAddress` and take the writing PC from the
+last exec callback. The 6502 also makes dummy reads (the byte after one-byte
+instructions, branch targets, return addresses, the next opcode when an
+interrupt is taken) and reads interrupt vectors, so `reads.lua` counts only
+instructions with a memory operand and leaves those reads out.
 
 ## NDS commands
 

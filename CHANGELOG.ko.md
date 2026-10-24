@@ -4,6 +4,14 @@
 
 ## 미출시
 
+- FC(패미컴): `krpatch fc info|dis|listing|lua`. `kr_patch.fc.ines` 가 iNES·
+  NES 2.0 헤더를 읽고, `kr_patch.fc.dis6502` 가 6502 코드를 PRG 오프셋과 CPU
+  주소로 디스어셈블하며 커버리지로 실행된 명령만 리스팅합니다.
+  `kr_patch/fc/lua/` 에 MesenCE Lua 스크립트 `boot.lua`, `seq.lua`,
+  `mkstate.lua` 와 프로브 `cover`, `reads`, `writes`, `trace`, `watch` 를
+  넣었습니다. 프로브에 `DRIVER=$LIBDIR/seq.lua` 를 주면 세이브스테이트에서
+  시작합니다.
+
 ## 0.4.0
 
 - **호환이 깨지는 변경:** 슈퍼 패미콤 도구의 이름을 모두 SFC 로 바꿨습니다.
