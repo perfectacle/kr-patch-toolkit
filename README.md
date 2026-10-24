@@ -3,13 +3,13 @@
 English | [한국어](README.ko.md)
 
 Game-independent tools for building and testing translation patches. Some are
-platform-independent (IPS patches, an LZSS codec, file diffs, screenshot
-comparison, bitmap glyph tools with macOS OCR, seamless music loops cut from
-recordings); the rest are for the SNES
-(Super Famicom): cartridge mappers, header checksums, a 65c816 disassembler,
-tile and BG rendering, a headless libretro test runner and Lua scripts for
-Mesen 2 and MesenCE.
-Other platforms (NDS first) are planned and will get their own `krpatch <platform>`
+platform-independent (IPS and xdelta/VCDIFF patches, LZSS and LZ10/LZ11
+codecs, file diffs, screenshot comparison, bitmap glyph tools with macOS OCR,
+linear bitmap rendering, seamless music loops cut from recordings); the rest
+are for a platform. SNES (Super Famicom): cartridge mappers, header checksums,
+a 65c816 disassembler, tile and BG rendering, a headless libretro test runner
+and Lua scripts for Mesen 2 and MesenCE. NDS: reading, unpacking and
+rebuilding ROM images. Each platform has its own `krpatch <platform>`
 commands.
 
 It is the shared part of several Korean translation patches. Anything specific
@@ -39,6 +39,9 @@ Addresses and offsets are hex unless stated otherwise.
 | --- | --- |
 | `krpatch ips make\|apply` | create and apply IPS patches |
 | `krpatch lzss decode\|encode` | LZSS codec |
+| `krpatch lz11 decode\|encode` | Nintendo LZ10/LZ11 codec |
+| `krpatch xdelta make\|apply` | create and apply xdelta (VCDIFF) patches |
+| `krpatch linear` | render linear bitmaps such as DS fonts |
 | `krpatch diff` | byte ranges where two files differ |
 | `krpatch shotcmp` | compare screenshots as text |
 | `krpatch contact` | contact sheet of screenshots |
@@ -51,6 +54,8 @@ Addresses and offsets are hex unless stated otherwise.
 | `krpatch snes bg`, `bgrefs` | BG layers from VRAM/CGRAM dumps |
 | `krpatch snes run` | headless libretro runner |
 | `krpatch snes lua` | path of the bundled Lua scripts for Mesen 2 and MesenCE |
+| `krpatch nds info\|ls` | NDS header, tables and file list |
+| `krpatch nds unpack\|pack` | NDS file system to a folder and back into a ROM |
 
 ### `ips`: create and apply IPS patches
 
@@ -79,6 +84,52 @@ krpatch lzss encode font.bin font.lz [--planar]
 
 `--planar` converts SNES 2bpp tiles stored as two planar halves to and from
 SNES order. A truncated stream or a copy with distance 0 is an error.
+
+### `lz11`: Nintendo LZ10/LZ11 codec
+
+The compression of the GBA/DS BIOS: a type byte (`0x10` or `0x11`) and a u24
+output size, then groups of eight items led by a flag byte (MSB first);
+references reach back up to 4096 bytes. LZ11 adds longer references (up to
+65808 bytes).
+
+```sh
+krpatch lz11 decode file.lz out.bin [--offset 1A0]
+krpatch lz11 encode out.bin file.lz [--lz10] [--vram]
+```
+
+The encoder is greedy (longest match, nearest of equal length), so the same
+input always gives the same bytes. `--vram` leaves out distance-1 references,
+which the BIOS routines that decompress straight to VRAM get wrong. It is not tuned to reproduce the output of
+other compressors. A truncated stream or a reference before the start is an
+error.
+
+### `xdelta`: xdelta (VCDIFF) patches
+
+For ROMs too large for IPS (over 16 MiB), such as DS games.
+
+```sh
+krpatch xdelta make original.nds patched.nds out.xdelta [--level 9]
+krpatch xdelta apply original.nds out.xdelta result.nds
+```
+
+`make` runs the `xdelta3` command (`--xdelta3` to name another) without
+secondary compression and without the application header that stores file
+names, with a 256 MiB source window so a whole cartridge is searched, then
+checks the patch by decoding it. `apply` is a pure-Python decoder: it reads
+patches made by `xdelta3` with secondary compression off (`-S none`) and
+checks each window's Adler-32, which fails when the source file is not the
+one the patch was made from. Patches with secondary compression or a custom
+code table are an error.
+
+### `linear`: linear bitmaps
+
+Bitmaps stored row by row with `--bpp` bits per pixel (not in 8x8 tiles), as
+DS games often store fonts. `--order lsb` puts the first pixel in the low bits
+of a byte (DS 4bpp), `msb` in the high bits.
+
+```sh
+krpatch linear font.bin font.png --size 16x24 --bpp 2 --order msb --start 0 --count 256
+```
 
 ### `diff`: byte ranges where two files differ
 
@@ -336,6 +387,44 @@ and MesenCE 2.2.1 with power-on RAM set to zeros
 the same in both, apart from the run-to-run differences each version shows on
 its own. Only the save state files are not byte for byte the same.
 
+## NDS commands
+
+### `nds info`, `nds ls`: header and files
+
+```sh
+krpatch nds info game.nds
+krpatch nds ls game.nds
+```
+
+`ls` prints the file id, offset, size and path of every file, overlays as
+`overlay9/overlay_0000.bin`.
+
+### `nds unpack`, `nds pack`: file system to a folder and back
+
+```sh
+krpatch nds unpack game.nds work/
+# edit files under work/data/ or work/overlay9/
+krpatch nds pack game.nds work/ patched.nds
+```
+
+`unpack` writes `header.bin`, `arm9.bin`, `arm7.bin`, `y9.bin`/`y7.bin`
+(overlay tables), `banner.bin`, `overlay9/`, `overlay7/` and the file system
+under `data/`. `pack` replaces the files under `data/`, `overlay9/` and
+`overlay7/` that differ from the ROM; other parts are not read. A replaced
+file stays in its slot when it fits (the rest of the slot becomes 0xFF or 0x00
+padding, whichever follows the slot) and moves to the end of the ROM, aligned
+to 0x200, when it does not or when another FAT entry shares its bytes. Data
+after the last file that is not padding, such as the Download Play signature,
+stays where it is. The FAT, the used size, the device capacity and the header
+CRC are updated. The overlay tables are not, so an overlay can only be
+replaced by data of the same size. DSi-enhanced ROMs are refused. `unpack`
+refuses ROMs with names that would leave the folder or that differ only in
+case. The same ROM
+and folder always give the same bytes, and unchanged files keep their
+offsets, which keeps patches small. File ids follow the ROM's own name table:
+two builds of a game may number the same file differently, so compare files
+by path.
+
 ## Python API
 
 ```python
@@ -353,11 +442,20 @@ from kr_patch.audio import loudness, wav
 
 x, rate = wav.read("song.wav")          # int16, shape (frames, channels)
 print(loudness.integrated(x / 32768, rate))
+
+from kr_patch import lz11, vcdiff
+from kr_patch.nds.rom import Rom, rebuild
+
+nds = Rom(open("game.nds", "rb").read())
+fid = nds.find("script/scene01.bin")           # path under data/
+text, _ = lz11.decompress(nds.file(fid))
+out = rebuild(nds, {fid: lz11.compress(text)})
 ```
 
 ## Planned
 
-- NDS support under `kr_patch.nds` and `krpatch nds ...`.
+- `krpatch nds run`: a headless libretro runner for DS cores, like
+  `snes run`.
 - `game.toml`: game projects describe their mapper, watched RAM, emulator
   matrix and scenarios in one file, so commands need fewer arguments.
 

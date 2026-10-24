@@ -4,6 +4,18 @@
 
 ## 미출시
 
+- NDS: `krpatch nds info|ls|unpack|pack` 와 `kr_patch.nds.rom` 이 DS 롬의 헤더,
+  이름 표, FAT, 오버레이 표를 읽고, 파일시스템을 폴더로 풀고, 파일을 바꾼 롬을
+  다시 묶습니다(들어가면 제자리, 아니면 끝으로 옮김. FAT, 사용 크기, 장치 용량,
+  헤더 CRC 를 고침).
+- `krpatch lz11 decode|encode`(`kr_patch.lz11`): 닌텐도 LZ10/LZ11 코덱.
+  `--vram` 은 VRAM 으로 바로 푸는 BIOS 루틴을 위해 거리 1 참조를 쓰지 않습니다.
+- `krpatch xdelta make|apply`(`kr_patch.vcdiff`): VCDIFF 패치. `make` 는 2차
+  압축과 헤더의 파일 이름 없이 `xdelta3` 를 돌리고, `apply` 는 창마다
+  Adler-32 를 확인하는 순수 Python 디코더입니다.
+- `krpatch linear`(`kr_patch.linear`): 1/2/4/8bpp 선형 비트맵을 바이트 안 픽셀
+  순서를 골라 렌더링합니다.
+- CI 가 `xdelta3` 를 설치해 `xdelta make` 테스트를 돌립니다.
 - `examples/snes/run_all.sh`: `MESENCE`(세이브 폴더는 `MESENCE_SAVES`)를 주면
   보관 처리된 Mesen 2 의 후속인 MesenCE 에서도 모든 시나리오를 돌립니다.
   `MESEN` 은 전과 같이 Mesen 2 를 돌립니다.
