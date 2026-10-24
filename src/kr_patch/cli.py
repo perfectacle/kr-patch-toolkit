@@ -25,7 +25,7 @@ def cmd_ips_make(a):
     base, patched = _read(a.base), _read(a.patched)
     jobs = [(a.out, False)] + ([(a.headered, True)] if a.headered else [])
     for path, hdr in jobs:
-        p = ips.make(base, patched, header=hdr, gap=a.gap)
+        p = ips.make(base, patched, header=hdr, gap=a.gap, rle=a.rle)
         pad = bytes(ips.COPIER) if hdr else b""
         if ips.apply(pad + base, p) != pad + patched:
             raise ValueError(f"{path}: does not reproduce the patched file")
@@ -728,6 +728,7 @@ def build_parser():
     q.add_argument("out")
     q.add_argument("--headered", metavar="OUT", help="also write a patch for SFC dumps with a 512-byte copier header")
     q.add_argument("--gap", type=int, default=6, help="equal bytes that end a record (default 6)")
+    q.add_argument("--rle", action="store_true", help="write long runs of one byte as RLE records (changes the output)")
     q.set_defaults(fn=cmd_ips_make)
     q = ips.add_parser("apply")
     q.add_argument("file")

@@ -4,6 +4,10 @@ English | [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
 
+- `ips make --rle` (and `ips.make(..., rle=True)`) writes runs of 16 or more
+  equal bytes as RLE records, so a patch that grows the ROM no longer carries
+  the filler of the new space. Off by default; output without it is unchanged.
+
 ## 0.6.0
 
 - `xdelta apply` reads patches made by stock `xdelta3` with its default LZMA

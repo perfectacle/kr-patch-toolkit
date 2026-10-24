@@ -4,9 +4,10 @@ COPIER = 512        # SFC SMC/SWC copier header in front of some dumps
 EOF_OFF = 0x454F46  # "EOF" as an offset would be read as the end marker
 MAX_LEN = 0xFFFF
 GAP = 6
+RLE_MIN = 16        # a run this long becomes an RLE record (8 bytes) instead of plain data
 
 
-def make(a, b, header=False, gap=GAP):
+def make(a, b, header=False, gap=GAP, rle=False):
     """Patch that turns `a` into `b`.
 
     A record ends at the first run of `gap` equal bytes; shorter equal runs are
@@ -16,6 +17,10 @@ def make(a, b, header=False, gap=GAP):
 
     header=True writes offsets for the same images behind a 512-byte SFC
     copier header, so one build can ship patches for headerless and headered dumps.
+
+    rle=True writes runs of RLE_MIN or more equal bytes as RLE records, which keeps
+    a patch that grows the ROM (filler in the new space) small. Off by default:
+    it changes the output.
     """
     if header:
         a, b = bytes(COPIER) + bytes(a), bytes(COPIER) + bytes(b)
@@ -28,9 +33,16 @@ def make(a, b, header=False, gap=GAP):
         if i < len(a) and a[i] == b[i]:
             i += 1
             continue
+        if rle and i != EOF_OFF and _run(b, i) >= RLE_MIN:
+            r = _run(b, i)
+            out += i.to_bytes(3, "big") + b"\0\0" + r.to_bytes(2, "big") + b[i:i + 1]
+            i += r
+            continue
         start = i if i != EOF_OFF else i - 1
         end = i
         while end < n and end - start < MAX_LEN:
+            if rle and end > start and end != EOF_OFF and _run(b, end) >= RLE_MIN:
+                break
             if end >= len(a) or a[end] != b[end]:
                 end += 1
                 continue
@@ -47,6 +59,14 @@ def make(a, b, header=False, gap=GAP):
     if len(b) > len(a):
         out += len(b).to_bytes(3, "big")
     return bytes(out)
+
+
+def _run(b, i):
+    """length of the run of b[i] starting at i, at most MAX_LEN"""
+    j = i
+    while j < len(b) and j - i < MAX_LEN and b[j] == b[i]:
+        j += 1
+    return j - i
 
 
 def apply(a, p):
