@@ -4,6 +4,8 @@ English | [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
 
+## 0.5.0
+
 - FC (Famicom): `krpatch fc info|dis|listing|lua`. `kr_patch.fc.ines` reads
   iNES and NES 2.0 headers; `kr_patch.fc.dis6502` disassembles 6502 code by
   PRG offset and CPU address, and lists only the instructions a coverage run
