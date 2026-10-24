@@ -4,6 +4,8 @@ English | [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
 
+## 0.6.0
+
 - `xdelta apply` reads patches made by stock `xdelta3` with its default LZMA
   secondary compression (`-S lzma`), which used to be an error; real-world
   patches are usually made this way. The other secondary compressors (DJW,
