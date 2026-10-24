@@ -5,7 +5,7 @@ description: 도구 코드(src/kr_patch, Lua 스크립트, tests)를 바꾸거�
 
 # 도구 코드
 
-이 스킬이 COMPAT-01, SCOPE-01, ROM-01, DOC-01 의 정본이다. 구조: 기종 무관 도구는 `src/kr_patch/`(`ips`·`lzss`·`diff`·`shots`·`glyph`·`audio`), SNES 전용은 `src/kr_patch/snes/`(매퍼·체크섬·디스어셈블러·타일·libretro 실행기), Mesen 2 Lua 스크립트는 `src/kr_patch/snes/lua/`, 명령 정의는 `src/kr_patch/cli.py` 한 곳이다. 새 기종은 `src/kr_patch/<기종>/` 과 `krpatch <기종>` 하위 명령으로 둔다.
+이 스킬이 COMPAT-01, SCOPE-01, ROM-01, DOC-01 의 정본이다. 구조: 기종 무관 도구는 `src/kr_patch/`(`ips`·`lzss`·`diff`·`shots`·`glyph`·`audio`), SNES 전용은 `src/kr_patch/snes/`(매퍼·체크섬·디스어셈블러·타일·libretro 실행기), Mesen 2·MesenCE Lua 스크립트는 `src/kr_patch/snes/lua/`, 명령 정의는 `src/kr_patch/cli.py` 한 곳이다. 새 기종은 `src/kr_patch/<기종>/` 과 `krpatch <기종>` 하위 명령으로 둔다.
 
 ## 절차
 
@@ -59,5 +59,5 @@ README 와 CHANGELOG 는 영어판(`*.md`)과 한국어판(`*.ko.md`)이 짝이�
 
 ## 참고
 
-- **Lua 스크립트**는 Mesen 2 가 읽는다. `tests/test_lua.py` 가 로컬 Lua 5.3/5.4 로 일부를 돌리고, CI 는 `luac5.4 -p` 로 문법만 본다.
+- **Lua 스크립트**는 Mesen 2 와 후속인 MesenCE 가 읽는다. 바꾸면 두 판에서 돌려 본다. `tests/test_lua.py` 가 로컬 Lua 5.3/5.4 로 일부를 돌리고, CI 는 `luac5.4 -p` 로 문법만 본다.
 - **ruff** 규칙은 버그를 잡는 것만 켰다(`pyproject.toml` 의 `[tool.ruff.lint]`). 한 줄에 짧은 문장을 모으는 기존 스타일은 의도라 고치지 않는다. 포맷터는 쓰지 않는다.

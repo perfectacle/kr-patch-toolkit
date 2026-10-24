@@ -532,7 +532,7 @@ def _snes_parser(sub):
     p.add_argument("-v", "--verbose", action="store_true", help="print core log and environment calls")
     p.set_defaults(fn=cmd_run)
 
-    p = snes.add_parser("lua", help="print the directory of the bundled Mesen 2 Lua scripts")
+    p = snes.add_parser("lua", help="print the directory of the bundled Mesen 2 / MesenCE Lua scripts")
     p.set_defaults(fn=cmd_lua)
 
 

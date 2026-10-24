@@ -37,4 +37,4 @@ description: 한국어 문서(README.ko.md, CHANGELOG.ko.md)를 쓰거나 고칠
 | command / option / argument           | 명령 / 옵션 / 인자                       |
 | release                               | 릴리스                                   |
 | checksum, IPS, LZSS, BG, VRAM, CGRAM  | 영어 그대로                              |
-| 제품 이름                             | 원어 그대로(Mesen 2, libretro, macOS, Python, uv) |
+| 제품 이름                             | 원어 그대로(Mesen 2, MesenCE, libretro, macOS, Python, uv) |
