@@ -6,7 +6,7 @@
 기종과도 무관하고(IPS·xdelta(VCDIFF) 패치, LZSS·LZ10/LZ11 코덱, 파일 비교,
 스크린샷 비교, macOS OCR 을 곁들인 비트맵 글리프 도구, 선형 비트맵 렌더링,
 녹음에서 끊김 없이 반복되는 배경음악 잘라 내기), 나머지는 기종별입니다.
-슈퍼패미컴(SNES): 카트리지 매퍼, 헤더 체크섬, 65c816 디스어셈블러, 타일·BG
+슈퍼 패미콤(SFC): 카트리지 매퍼, 헤더 체크섬, 65c816 디스어셈블러, 타일·BG
 렌더링, 헤드리스 libretro 테스트 실행기, Mesen 2·MesenCE 용 Lua 스크립트.
 NDS: 롬 이미지 읽기·풀기·다시 묶기. 기종마다 `krpatch <기종>` 명령을 따로
 둡니다.
@@ -32,7 +32,7 @@ pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.3.0
 
 ## 명령
 
-모든 옵션은 `krpatch <명령> -h`(또는 `krpatch snes <명령> -h`)로 볼 수 있습니다.
+모든 옵션은 `krpatch <명령> -h`(또는 `krpatch sfc <명령> -h`)로 볼 수 있습니다.
 주소와 오프셋은 따로 적지 않으면 16진수입니다.
 
 | 명령 | 하는 일 |
@@ -48,12 +48,12 @@ pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.3.0
 | `krpatch glyph show\|make\|set` | JSON 저장소의 비트맵 글리프 |
 | `krpatch ocr` | macOS Vision 으로 글리프 읽기 |
 | `krpatch audio segments\|period\|loop\|seamcheck\|loudness` | 곡 경계, 반복 주기, 반복 재생용 파일, 음량 |
-| `krpatch snes dis` | 65c816 코드 디스어셈블 |
-| `krpatch snes checksum` | 내부 헤더 체크섬 확인·수정 |
-| `krpatch snes tiles` | planar 타일 렌더링 |
-| `krpatch snes bg`, `bgrefs` | VRAM/CGRAM 덤프에서 BG 레이어 |
-| `krpatch snes run` | 헤드리스 libretro 실행기 |
-| `krpatch snes lua` | 함께 들어 있는 Mesen 2·MesenCE 용 Lua 스크립트 경로 |
+| `krpatch sfc dis` | 65c816 코드 디스어셈블 |
+| `krpatch sfc checksum` | 내부 헤더 체크섬 확인·수정 |
+| `krpatch sfc tiles` | planar 타일 렌더링 |
+| `krpatch sfc bg`, `bgrefs` | VRAM/CGRAM 덤프에서 BG 레이어 |
+| `krpatch sfc run` | 헤드리스 libretro 실행기 |
+| `krpatch sfc lua` | 함께 들어 있는 Mesen 2·MesenCE 용 Lua 스크립트 경로 |
 | `krpatch nds info\|ls` | NDS 헤더, 표, 파일 목록 |
 | `krpatch nds unpack\|pack` | NDS 파일시스템을 폴더로 풀고 다시 롬으로 묶기 |
 
@@ -65,7 +65,7 @@ krpatch ips apply original.sfc out.ips result.sfc
 ```
 
 `make` 는 패치를 쓰기 전에 각 패치가 패치된 파일을 그대로 재현하는지
-확인합니다. `--headered` 를 주면 512바이트 카피어 헤더가 붙은 SNES 덤프용
+확인합니다. `--headered` 를 주면 512바이트 카피어 헤더가 붙은 SFC 덤프용
 패치도 함께 씁니다. `--gap N` 은 같은 바이트가 몇 개 이어지면 레코드를
 끊을지 정합니다(기본값 6). gap 이 다른 패치도 똑같이 유효하지만 바이트까지
 같지는 않으므로, 프로젝트가 이미 배포한 값을 그대로 쓰세요. IPS 의 24비트
@@ -82,7 +82,7 @@ krpatch lzss decode game.sfc 0A8000 font.bin [--planar]
 krpatch lzss encode font.bin font.lz [--planar]
 ```
 
-`--planar` 는 두 planar 절반으로 저장된 SNES 2bpp 타일을 SNES 순서로 바꾸거나
+`--planar` 는 두 planar 절반으로 저장된 SFC 2bpp 타일을 SFC 순서로 바꾸거나
 그 반대로 바꿉니다. 스트림이 잘렸거나 거리가 0인 복사가 있으면 오류입니다.
 
 ### `lz11`: 닌텐도 LZ10/LZ11 코덱
@@ -169,7 +169,7 @@ krpatch ocr glyphs.json ocr-rows/ --per-row 10 --fix-mo  # macOS 전용
 
 ### `audio`: 녹음에서 반복 재생용 파일 만들기
 
-에뮬레이터에서 녹음한 게임 음악(예: `krpatch snes run --wav`)을 다룹니다.
+에뮬레이터에서 녹음한 게임 음악(예: `krpatch sfc run --wav`)을 다룹니다.
 입력은 16비트 PCM WAV 이고, 시간은 따로 적지 않으면 초 단위입니다. 채널을
 모노로 섞지 않으므로 좌우 위상이 반대인 음성도 사라지지 않습니다.
 
@@ -257,58 +257,58 @@ loopEnd 를 지나 그대로 이어지는 같은 프레임도 잽니다. 파일�
 
 읽을 수 없거나 잘린 WAV 파일은 오류입니다(종료 코드 2).
 
-## SNES 명령
+## SFC 명령
 
-### `snes dis`: 65c816 코드 디스어셈블
+### `sfc dis`: 65c816 코드 디스어셈블
 
 ```sh
-krpatch snes dis game.sfc 808000 40              # $80:8000 부터 명령어 40개
-krpatch snes dis game.sfc C08000 --mapper sa1    # lorom | hirom | exhirom | sa1 | auto(기본값)
-krpatch snes dis game.sfc 808000 --m16 --x16     # 16비트 A·X/Y 로 시작
+krpatch sfc dis game.sfc 808000 40              # $80:8000 부터 명령어 40개
+krpatch sfc dis game.sfc C08000 --mapper sa1    # lorom | hirom | exhirom | sa1 | auto(기본값)
+krpatch sfc dis game.sfc 808000 --m16 --x16     # 16비트 A·X/Y 로 시작
 ```
 
 `REP`/`SEP` 를 만나면 해독하면서 레지스터 폭을 바꿉니다. 블록 이동은 어셈블러
 순서 `MVN src,dst` 로 출력합니다. `auto` 는 내부 헤더를 읽어 매퍼를 고르고,
 512바이트 카피어 헤더는 건너뜁니다. SA-1 은 전원을 켰을 때의 Super MMC
-블록(0-3)을 씁니다. 다른 블록은 `kr_patch.snes.mapper.SA1(blocks=...)` 로
+블록(0-3)을 씁니다. 다른 블록은 `kr_patch.sfc.mapper.SA1(blocks=...)` 로
 넘깁니다.
 
-### `snes checksum`: 헤더 체크섬 확인·수정
+### `sfc checksum`: 헤더 체크섬 확인·수정
 
 ```sh
-krpatch snes checksum game.sfc          # 매퍼, 제목, 저장된 값과 계산한 값 출력. 틀리면 1로 끝남
-krpatch snes checksum game.sfc --fix    # 보수와 체크섬을 제자리에서 다시 씀
+krpatch sfc checksum game.sfc          # 매퍼, 제목, 저장된 값과 계산한 값 출력. 틀리면 1로 끝남
+krpatch sfc checksum game.sfc --fix    # 보수와 체크섬을 제자리에서 다시 씀
 ```
 
 내부 헤더를 알아볼 수 없으면 `--fix` 는 거부합니다. `--mapper` 를 주면
 진행합니다. 크기가 2의 거듭제곱이 아니면 카트리지가 미러링하는 방식대로
 더합니다.
 
-### `snes tiles`: planar 타일 렌더링
+### `sfc tiles`: planar 타일 렌더링
 
 ```sh
-krpatch snes tiles game.sfc 1C0000 2000 font.png --bpp 2
-krpatch snes tiles game.sfc 1C0000 2000 font.png --bpp 2 --rows 12 --stride 20   # 0x20바이트 칸의 8x12 글리프
-krpatch snes tiles vram.bin 4000 2000 vram.png --bpp 2 --tall                    # 타일 쌍으로 된 8x16 글리프
+krpatch sfc tiles game.sfc 1C0000 2000 font.png --bpp 2
+krpatch sfc tiles game.sfc 1C0000 2000 font.png --bpp 2 --rows 12 --stride 20   # 0x20바이트 칸의 8x12 글리프
+krpatch sfc tiles vram.bin 4000 2000 vram.png --bpp 2 --tall                    # 타일 쌍으로 된 8x16 글리프
 ```
 
 START 와 LENGTH 는 어떤 파일(롬, VRAM 덤프, 압축 푼 데이터)에서든 바이트
 오프셋입니다.
 
-### `snes bg`, `snes bgrefs`: VRAM/CGRAM 덤프에서 BG 레이어
+### `sfc bg`, `sfc bgrefs`: VRAM/CGRAM 덤프에서 BG 레이어
 
 ```sh
-krpatch snes bg vram.bin cgram.bin 0 0x1000 4 bg1.png             # 타일맵·CHR 워드 주소, bpp
-krpatch snes bgrefs vram.bin --layer 0:0x1000:4 --layer 0x400:0x2000:4 --layer 0x800:0x3000:2 --range 6000-7FFF
+krpatch sfc bg vram.bin cgram.bin 0 0x1000 4 bg1.png             # 타일맵·CHR 워드 주소, bpp
+krpatch sfc bgrefs vram.bin --layer 0:0x1000:4 --layer 0x400:0x2000:4 --layer 0x800:0x3000:2 --range 6000-7FFF
 ```
 
 `bgrefs` 는 각 레이어의 타일맵이 VRAM 범위의 어느 부분을 쓰는지 알려 줍니다.
 새 글리프를 넣을 빈 VRAM 을 찾을 때 씁니다.
 
-### `snes run`: 헤드리스 libretro 실행기
+### `sfc run`: 헤드리스 libretro 실행기
 
 ```sh
-krpatch snes run cores/snes9x_libretro.dylib game.sfc out/ s_new.txt [save.srm] --watch 7E0010:2
+krpatch sfc run cores/snes9x_libretro.dylib game.sfc out/ s_new.txt [save.srm] --watch 7E0010:2
 ```
 
 입력 스크립트를 재생하면서 `f<frame>.png` 스크린샷, `end.png`, 덤프,
@@ -348,22 +348,22 @@ krpatch snes run cores/snes9x_libretro.dylib game.sfc out/ s_new.txt [save.srm] 
 Action Replay 치트로 `--cheat-hold` 프레임(기본값 40) 동안 적용하며, 겹치는
 poke 는 치트 슬롯을 따로 씁니다.
 
-`examples/snes/run_all.sh` 는 모든 시나리오를 모든 코어에서 돌리고(`MESEN` 을
+`examples/sfc/run_all.sh` 는 모든 시나리오를 모든 코어에서 돌리고(`MESEN` 을
 주면 Mesen 2, `MESENCE` 를 주면 MesenCE 에서도) 실행마다 결과 한 줄을 모읍니다.
 
-### `snes lua`: Mesen 2·MesenCE 스크립트
+### `sfc lua`: Mesen 2·MesenCE 스크립트
 
 ```sh
-krpatch snes lua    # 함께 들어 있는 Lua 스크립트의 디렉터리를 출력
+krpatch sfc lua    # 함께 들어 있는 Lua 스크립트의 디렉터리를 출력
 ```
 
-`Mesen --testrunner rom.sfc <script>` 와 `LIBDIR=$(krpatch snes lua)` 로 실행합니다.
+`Mesen --testrunner rom.sfc <script>` 와 `LIBDIR=$(krpatch sfc lua)` 로 실행합니다.
 
 | 스크립트 | 하는 일 |
 | --- | --- |
 | `lib.lua` | 공통 도우미: 스크린샷, 세이브 스테이트, 메모리 덤프, 입력 |
 | `boot.lua` | 전원 켜기, 주기적 탭(`TAP`, `PERIOD`, `TAPUNTIL`), 누르기(`SEQ="start@400:3"`), `MAXF` 까지 `EVERY` 프레임마다 스크린샷 |
-| `script.lua` | `krpatch snes run` 스크립트를 같은 해석 규칙으로 재생(`SCRIPT`, `SRM`, `WATCH_WRAM`, `WATCH_FMT`) |
+| `script.lua` | `krpatch sfc run` 스크립트를 같은 해석 규칙으로 재생(`SCRIPT`, `SRM`, `WATCH_WRAM`, `WATCH_FMT`) |
 | `seq.lua` | 세이브 스테이트에서 `SEQ="btn:frames,wait:frames"` 를 `POKE`/`WATCH` 와 함께 재생 |
 | `poke_state.lua` | `STATE` 를 불러와 `POKE` 를 한 번 쓰고 `OUT` 에 저장 |
 | `dumpsrm.lua` | 세이브 스테이트의 세이브 RAM 을 `save.srm` 으로 씀 |
@@ -425,8 +425,8 @@ krpatch nds pack game.nds work/ patched.nds
 
 ```python
 from kr_patch import ips
-from kr_patch.snes import header
-from kr_patch.snes.dis65816 import disasm
+from kr_patch.sfc import header
+from kr_patch.sfc.dis65816 import disasm
 
 rom = open("game.sfc", "rb").read()
 mp = header.detect(rom)                 # LoROM / HiROM / ExHiROM / SA1
@@ -450,7 +450,7 @@ out = rebuild(nds, {fid: lz11.compress(text)})
 
 ## 계획
 
-- `krpatch nds run`: `snes run` 처럼 DS 코어용 헤드리스 libretro 실행기.
+- `krpatch nds run`: `sfc run` 처럼 DS 코어용 헤드리스 libretro 실행기.
 - `game.toml`: 게임 프로젝트가 매퍼, 감시할 RAM, 에뮬레이터 조합, 시나리오를
   파일 하나에 적어 두어 명령에 넘길 인자를 줄입니다.
 

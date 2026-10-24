@@ -4,6 +4,14 @@
 
 ## 미출시
 
+- **호환이 깨지는 변경:** 슈퍼 패미콤 도구의 이름을 모두 SFC 로 바꿨습니다.
+  `krpatch snes …` 하위 명령은 `krpatch sfc …`(`dis`, `checksum`, `tiles`,
+  `bg`, `bgrefs`, `run`, `lua`)입니다. 옛 이름은 별칭으로 남기지 않습니다.
+  패키지 `kr_patch.snes` 는 `kr_patch.sfc`(Lua 스크립트는
+  `kr_patch/sfc/lua/` 아래), `tiles.planar_to_snes`/`snes_to_planar` 는
+  `planar_to_sfc`/`sfc_to_planar`, `examples/snes/` 는 `examples/sfc/` 입니다.
+  명령의 출력은 그대로입니다.
+
 ## 0.3.0
 
 - NDS: `krpatch nds info|ls|unpack|pack` 와 `kr_patch.nds.rom` 이 DS 롬의 헤더,

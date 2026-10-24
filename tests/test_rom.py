@@ -1,7 +1,7 @@
 import pytest
 
 from kr_patch import diff, ips
-from kr_patch.snes import header, mapper
+from kr_patch.sfc import header, mapper
 
 
 @pytest.mark.parametrize("kind", ["lorom", "hirom", "sa1", "exhirom"])

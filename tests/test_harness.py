@@ -2,7 +2,7 @@ import pytest
 from PIL import Image
 
 from kr_patch import shots
-from kr_patch.snes import libretro, script
+from kr_patch.sfc import libretro, script
 
 SCRIPT = """\
 # boot

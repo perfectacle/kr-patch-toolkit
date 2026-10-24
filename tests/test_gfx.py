@@ -1,6 +1,6 @@
 import pytest
 
-from kr_patch.snes import bg, tiles
+from kr_patch.sfc import bg, tiles
 
 
 # a diagonal with every colour index of the depth

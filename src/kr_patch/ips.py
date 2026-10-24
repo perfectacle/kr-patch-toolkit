@@ -1,6 +1,6 @@
 """Create or apply IPS patches."""
 
-COPIER = 512        # SNES SMC/SWC copier header in front of some dumps
+COPIER = 512        # SFC SMC/SWC copier header in front of some dumps
 EOF_OFF = 0x454F46  # "EOF" as an offset would be read as the end marker
 MAX_LEN = 0xFFFF
 GAP = 6
@@ -14,7 +14,7 @@ def make(a, b, header=False, gap=GAP):
     Different gaps give different (equally valid) patches, so keep the value a
     project has shipped with if its patches must stay byte-identical.
 
-    header=True writes offsets for the same images behind a 512-byte SNES
+    header=True writes offsets for the same images behind a 512-byte SFC
     copier header, so one build can ship patches for headerless and headered dumps.
     """
     if header:
