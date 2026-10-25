@@ -4,6 +4,8 @@ English | [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
 
+## 0.8.0
+
 - NDS: `krpatch nds font info|sheet` and `kr_patch.nds.font` read NFTR bitmap
   fonts (FINF, CGLP, CWDH, and CMAP types 0, 1 and 2): glyph bitmaps, code to
   glyph index, widths, and a PNG sheet of the glyphs.
