@@ -4,6 +4,10 @@ English | [한국어](CHANGELOG.ko.md)
 
 ## Unreleased
 
+- NDS: `krpatch nds font info|sheet` and `kr_patch.nds.font` read NFTR bitmap
+  fonts (FINF, CGLP, CWDH, and CMAP types 0, 1 and 2): glyph bitmaps, code to
+  glyph index, widths, and a PNG sheet of the glyphs.
+
 ## 0.7.0
 
 - `ips make --rle` (and `ips.make(..., rle=True)`) writes runs of 16 or more

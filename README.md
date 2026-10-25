@@ -10,7 +10,7 @@ are for a platform. SFC (Super Famicom): cartridge mappers, header checksums,
 a 65c816 disassembler, tile and BG rendering, a headless libretro test runner
 and Lua scripts for Mesen 2 and MesenCE. FC (Famicom): iNES headers,
 a 6502 disassembler with coverage listings and MesenCE Lua probes. NDS:
-reading, unpacking and rebuilding ROM images. Each platform has its own
+reading, unpacking and rebuilding ROM images, NFTR fonts. Each platform has its own
 `krpatch <platform>` commands.
 
 It is the shared part of several Korean translation patches. Anything specific
@@ -60,6 +60,7 @@ Addresses and offsets are hex unless stated otherwise.
 | `krpatch fc lua` | path of the bundled MesenCE Lua scripts for FC |
 | `krpatch nds info\|ls` | NDS header, tables and file list |
 | `krpatch nds unpack\|pack` | NDS file system to a folder and back into a ROM |
+| `krpatch nds font info\|sheet` | NFTR bitmap font summary and glyph sheet |
 
 ### `ips`: create and apply IPS patches
 
@@ -513,6 +514,25 @@ and folder always give the same bytes, and unchanged files keep their
 offsets, which keeps patches small. File ids follow the ROM's own name table:
 two builds of a game may number the same file differently, so compare files
 by path.
+
+### `nds font info`, `nds font sheet`: NFTR bitmap fonts
+
+```sh
+krpatch nds font info font.nftr
+krpatch nds font sheet font.nftr sheet.png [--codes 3040-30FF] [--cols 32] [--scale 2]
+```
+
+Reads NFTR (`RTFN`) fonts taken out of a ROM with `nds unpack`: the FINF,
+CGLP, CWDH and CMAP blocks, with CMAP types 0 (a code range mapped to
+consecutive glyphs), 1 (a table per code, 0xFFFF for none) and 2 (code and
+glyph pairs). Glyph pixels are packed row by row without padding, most
+significant bit first. `info` prints the cell size, bits per pixel, glyph and
+code counts, line height, baseline, encoding, the default width and how many
+codes fall in each 256-code page. `sheet` draws the glyphs in code order with
+a 1-pixel gray border, ink dark and blank pixels light; `--codes` takes a hex
+range. In Python, `kr_patch.nds.font.Font` gives `glyph(i)` (rows of pixel
+values), `code_glyph(code)`, `width(i)` (left offset, glyph width, advance)
+and `cmap`.
 
 ## Python API
 

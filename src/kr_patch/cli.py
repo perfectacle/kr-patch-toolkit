@@ -691,6 +691,46 @@ def cmd_nds_pack(a):
     print(f"{len(changed)} files replaced -> {a.out} ({len(out)} bytes)")
 
 
+def _font(path):
+    from .nds.font import Font
+    return Font(_read(path))
+
+
+def _code_range(s):
+    lo, _, hi = s.partition("-")
+    lo = int(lo, 16)
+    hi = int(hi, 16) if hi else lo
+    if hi < lo:
+        raise argparse.ArgumentTypeError(f"{s}: end before start")
+    return lo, hi
+
+
+def cmd_nds_font_info(a):
+    from .nds.font import ENCODINGS
+    f = _font(a.font)
+    enc = ENCODINGS.get(f.encoding, f"unknown ({f.encoding})")
+    print(f"cell {f.cell_w}x{f.cell_h}  bpp {f.bpp}  glyphs {f.count}  codes {len(f.cmap)}  "
+          f"line {f.line_height}  baseline {f.baseline}  max width {f.max_w}  encoding {enc}")
+    left, width, adv = f.default_width
+    print(f"default width left {left} width {width} advance {adv}  error glyph {f.error_glyph}  "
+          f"widths for {len(f.widths)} glyphs")
+    pages = {}
+    for code in f.cmap:
+        pages[code >> 8] = pages.get(code >> 8, 0) + 1
+    print(" ".join(f"{k:02X}xx:{v}" for k, v in sorted(pages.items())))
+
+
+def cmd_nds_font_sheet(a):
+    from .nds.font import sheet
+    f = _font(a.font)
+    codes = sorted(f.cmap)
+    if a.codes:
+        lo, hi = a.codes
+        codes = [c for c in codes if lo <= c <= hi]
+    sheet(f, codes, a.cols, a.scale).save(a.out)
+    print(f"{len(codes)} glyphs -> {a.out}")
+
+
 def _nds_parser(sub):
     nds = sub.add_parser("nds", help="Nintendo DS tools").add_subparsers(
         dest="nds_cmd", required=True, metavar="command")
@@ -713,6 +753,19 @@ def _nds_parser(sub):
     p.add_argument("dir")
     p.add_argument("out")
     p.set_defaults(fn=cmd_nds_pack)
+
+    font = nds.add_parser("font", help="NFTR bitmap fonts").add_subparsers(
+        dest="font_cmd", required=True, metavar="command")
+    p = font.add_parser("info", help="cell size, bits per pixel, glyph and code counts, codes per 256-code page")
+    p.add_argument("font")
+    p.set_defaults(fn=cmd_nds_font_info)
+    p = font.add_parser("sheet", help="PNG of the glyphs in code order")
+    p.add_argument("font")
+    p.add_argument("out")
+    p.add_argument("--codes", type=_code_range, metavar="LO-HI", help="only codes LO..HI (hex)")
+    p.add_argument("--cols", type=int, default=32, help="glyphs per row (default 32)")
+    p.add_argument("--scale", type=int, default=2, help="pixel scale (default 2)")
+    p.set_defaults(fn=cmd_nds_font_sheet)
 
 
 def build_parser():
