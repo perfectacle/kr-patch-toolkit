@@ -4,6 +4,8 @@
 
 ## 미출시
 
+## 0.8.0
+
 - NDS: `krpatch nds font info|sheet` 와 `kr_patch.nds.font` 가 NFTR 비트맵
   폰트(FINF, CGLP, CWDH, CMAP 종류 0·1·2)를 읽습니다. 글리프 비트맵, 코드에서
   글리프 번호, 폭을 얻고 글리프를 PNG 표로 그립니다.
