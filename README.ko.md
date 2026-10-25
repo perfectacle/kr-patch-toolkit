@@ -9,7 +9,7 @@
 슈퍼 패미콤(SFC): 카트리지 매퍼, 헤더 체크섬, 65c816 디스어셈블러, 타일·BG
 렌더링, 헤드리스 libretro 테스트 실행기, Mesen 2·MesenCE 용 Lua 스크립트.
 FC(패미컴): iNES 헤더, 커버리지 리스팅을 곁들인 6502 디스어셈블러, MesenCE 용 Lua
-프로브. NDS: 롬 이미지 읽기·풀기·다시 묶기. 기종마다 `krpatch <기종>` 명령을 따로
+프로브. NDS: 롬 이미지 읽기·풀기·다시 묶기, NFTR 폰트 읽기. 기종마다 `krpatch <기종>` 명령을 따로
 둡니다.
 
 여러 한글 패치가 함께 쓰는 부분을 모은 것입니다. 한 게임에만 해당하는 것
@@ -60,6 +60,7 @@ pip install git+https://github.com/perfectacle/kr-patch-toolkit@v0.7.0
 | `krpatch fc lua` | 함께 들어 있는 FC 용 MesenCE Lua 스크립트 경로 |
 | `krpatch nds info\|ls` | NDS 헤더, 표, 파일 목록 |
 | `krpatch nds unpack\|pack` | NDS 파일시스템을 폴더로 풀고 다시 롬으로 묶기 |
+| `krpatch nds font info\|sheet` | NFTR 비트맵 폰트 요약과 글리프 표 |
 
 ### `ips`: IPS 패치 생성·적용
 
@@ -505,6 +506,25 @@ krpatch nds pack game.nds work/ patched.nds
 내고, 바뀌지 않은 파일은 오프셋이 그대로라 패치가 작습니다. 파일 번호는 롬의
 이름 표를 따릅니다. 같은 게임도 빌드에 따라 같은 파일의 번호가 다를 수 있으니
 파일은 경로로 비교합니다.
+
+### `nds font info`, `nds font sheet`: NFTR 비트맵 폰트
+
+```sh
+krpatch nds font info font.nftr
+krpatch nds font sheet font.nftr sheet.png [--codes 3040-30FF] [--cols 32] [--scale 2]
+```
+
+`nds unpack` 으로 꺼낸 NFTR(`RTFN`) 폰트를 읽습니다. FINF, CGLP, CWDH, CMAP
+블록을 읽고, CMAP 은 세 종류를 모두 읽습니다. 종류 0 은 코드 범위를 이어진
+글리프에 대응시키고, 종류 1 은 코드마다 글리프 번호를 적은 표(없으면 0xFFFF),
+종류 2 는 코드와 글리프 번호의 쌍입니다. 글리프 픽셀은 줄 사이 채움 없이 줄
+순서로, 높은 비트부터 들어 있습니다. `info` 는 칸 크기, 픽셀당 비트 수, 글리프
+수와 코드 수, 줄 높이, 기준선, 인코딩, 기본 폭, 256개 코드 묶음마다 든 코드 수를
+출력합니다. `sheet` 는 글리프를 코드 순서로 1픽셀 회색 테두리를 둘러 그립니다.
+잉크는 어둡게, 빈 픽셀은 밝게 그립니다. `--codes` 는 16진 범위를 받습니다.
+Python 에서는 `kr_patch.nds.font.Font` 의 `glyph(i)`(픽셀 값의 줄 목록),
+`code_glyph(code)`, `width(i)`(왼쪽 여백, 글리프 폭, 다음 글자까지 거리),
+`cmap` 을 씁니다.
 
 ## Python API
 
